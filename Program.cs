@@ -15,6 +15,9 @@
  *              NET Core 3.1 
  *              (https://docs.microsoft.com/en-gb/dotnet/core/install/linux-debian)
  *              (https://docs.microsoft.com/en-gb/dotnet/core/install/how-to-detect-installed-versions?pivots=os-linux)
+ *              
+ * Dependent:   RaspberrySharp (1.4.0)
+ *              System.IO.Ports (4.7.0)
  * 
  * License:     GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
  * 
