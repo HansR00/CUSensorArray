@@ -57,15 +57,15 @@ Other sensors can (and will)e added.
 Wiring is your own of course but make sure the datalines are as below.
 
 [PMS1003]
-Enable: +3v
-Reset:  +3v
-Rx:     GPIO15
-Tx:     GPIO14
-Gnd:    Ground
-Power:  +5v
-
+ * Enable: +3v;
+ * Reset:  +3v;
+ * Rx:     GPIO15;
+ * Tx:     GPIO14;
+ * Gnd:    Ground;
+ * Power:  +5v;
+ 
 [SHT31]
-Vin:    +3v
-Gnd:    Gnd
-Scl:    SCL i2c (pin 5)
-Sda:    SDA i2c (pin 3)
+ * Vin:    +3v
+ * Gnd:    Gnd
+ * SCL:    SCL i2c (pin 5)
+ * SDA:    SDA i2c (pin 3)
