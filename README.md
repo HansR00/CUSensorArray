@@ -50,4 +50,22 @@ NOTE: it must be run as root to prevent problems with GPIO accessibility. The RP
       If CMX is running and properly configured it will poll for the AirLink and the CUSensorArray will respond as an AirLink and you will find you data
       in the CMX AirLink data file.
       
-Other sensors can [and will] be added.
+Other sensors can (and will)e added.
+
+[Wiring] :
+
+Wiring is your own of course but make sure the datalines are as below.
+
+[PMS1003]
+Enable: +3v
+Reset:  +3v
+Rx:     GPIO15
+Tx:     GPIO14
+Gnd:    Ground
+Power:  +5v
+
+[SHT31]
+Vin:    +3v
+Gnd:    Gnd
+Scl:    SCL i2c (pin 5)
+Sda:    SDA i2c (pin 3)
