@@ -37,7 +37,7 @@ namespace zeroWsensors
 
     #endregion
 
-#region SpecificConversionByteHex
+    #region SpecificConversionByteHex
     public string ByteArrayToHexString(byte[] ba)
     {
       // https://stackoverflow.com/questions/311165/how-do-you-convert-a-byte-array-to-a-hexadecimal-string-and-vice-versa
@@ -66,7 +66,7 @@ namespace zeroWsensors
     }
 #endregion
 
-#region VersionCopyright
+    #region VersionCopyright
     public string Version()
     {
       string _ver = "";
@@ -78,7 +78,7 @@ namespace zeroWsensors
                      typeof(Support).Assembly.GetName().Version.Build.ToString(CultureInfo.InvariantCulture);
 
         _ver = string.Format(CultureInfo.InvariantCulture, $"CUSensorArray - Version {_ver} " +
-                             $"- Started at {DateTime.Now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)})");
+                             $"- Started at {DateTime.Now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}");
 
         this.LogTraceMessage($"Support: {_ver}");
       }

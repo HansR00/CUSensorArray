@@ -119,6 +119,9 @@ namespace zeroWsensors
       Console.WriteLine("CUSensorArray - Copyright (C) 2020  Hans Rottier\n" +
         "This program comes with ABSOLUTELY NO WARRANTY;\n" +
         "This is free software, and you are welcome to redistribute it under certain conditions.");
+      Sup.LogDebugMessage("CUSensorArray - Copyright (C) 2020  Hans Rottier\n" +
+        "This program comes with ABSOLUTELY NO WARRANTY;\n" +
+        "This is free software, and you are welcome to redistribute it under certain conditions.");
 
       // So, here we go...
       I2C thisI2C = new I2C(Sup);
@@ -155,7 +158,7 @@ namespace zeroWsensors
         do
         {
           // Do this condional because the ctrl-c interrupt can be given aanywhere.
-          Sup.LogDebugMessage(message: "ZeroWsensors : Getting sensor values from the Main 10 second loop");
+          Sup.LogTraceMessage(message: "ZeroWsensors : Getting sensor values from the Main 10 second loop");
 
           if (Continue) thisSerial.DoPMS1003();
           if (Continue) thisI2C.DoI2C();
@@ -164,7 +167,7 @@ namespace zeroWsensors
 
           if (Clock == 6)
           {
-            thisLine = $"{thisI2C.SHT31current.Temperature:F1};{thisI2C.SHT31current.Humidity:F0};" +
+            thisLine = $"{thisI2C.SHT31current.TemperatureC:F1};{thisI2C.SHT31current.Humidity:F0};" +
               // $"{thisSerial.MinuteValues.Pm1_stand:F1};{thisSerial.MinuteValues.Pm25_stand:F1};{thisSerial.MinuteValues.Pm10_stand:F1};" +
               $"{thisSerial.MinuteValues.Pm1_atm:F1};{thisSerial.MinuteValues.Pm25_atm:F1};{thisSerial.MinuteValues.Pm10_atm:F1};";
 
@@ -182,9 +185,10 @@ namespace zeroWsensors
 
       Sup.LogDebugMessage("SensorArray Gracefull exit... End");
 
-      Thread.Sleep(1000); // Give some time to wind down all obligations
       Trace.Flush();
       Trace.Close();
+
+      Thread.Sleep(1000); // Give some time to wind down all obligations
 
       return;
     } // main()

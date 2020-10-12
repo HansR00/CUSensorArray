@@ -34,7 +34,6 @@ namespace zeroWsensors
     public double Pm1_atm { get; set; }
     public double Pm25_atm { get; set; }
     public double Pm10_atm { get; set; }
-    public bool Valid { get; set; }
   }
 
   class Serial
@@ -98,6 +97,10 @@ namespace zeroWsensors
       catch (Exception e) when (e is ArgumentOutOfRangeException || e is ArgumentException || e is IOException || e is InvalidOperationException)
       {
         Sup.LogDebugMessage($"Serial: Exception on Open : {e.Message}");
+        Sup.LogDebugMessage("No use continuing when the particle sensor is not there - exit");
+        //
+        // No use continuing when the particle sensor is not there so exit
+        //
         Environment.Exit(0);
       }
 
@@ -157,15 +160,13 @@ namespace zeroWsensors
           thisReading.Pm1_atm = buffer[10] * 255 + buffer[11];
           thisReading.Pm25_atm = buffer[12] * 255 + buffer[13];
           thisReading.Pm10_atm = buffer[14] * 255 + buffer[15];
-          thisReading.Valid = true;
 
           ObservationList.Add(thisReading);
         }
       }
       catch (Exception e) when (e is ArgumentOutOfRangeException || e is ArgumentException || e is TimeoutException || e is InvalidOperationException || e is ArgumentNullException || e is IOException)
       {
-        Sup.LogTraceMessage($"DoPMS1003: Exception on Read => {e.Message}");
-        thisReading.Valid = false;
+        Sup.LogDebugMessage($"DoPMS1003: Exception on Serial Read => {e.Message}");
         // Continue reading 
       }
 
@@ -182,13 +183,12 @@ namespace zeroWsensors
       // Actually if a read fails, this is not a true observation, it actually functions as 
       // the counter to keep track of the number of 10 second cycles we passed
       NrOfObservations++;
-      Sup.LogTraceMessage($"DoPMS1003: Start of function => NrOfObservations = {NrOfObservations}");
+      Sup.LogTraceMessage($"DoPMS1003: FakeAirLink, start of function => NrOfObservations = {NrOfObservations}");
 
       // Handle the reads into the minute values and calculate all values for the AirLink simulation
       if (NrOfObservations == 6)
       {
-        Sup.LogDebugMessage($"Serial: Creating minutevalues...");
-
+        Sup.LogTraceMessage($"Serial: Creating minutevalues as average of the 10 second observations...");
         // So we came here 6 times every 10 seconds. Create the minute values and remove the existing list, create a new one
         // The average values are always real averages even if some fetches failed in which case the list is shorter 
         // Might remove the Valid attribute in the structure
@@ -200,7 +200,7 @@ namespace zeroWsensors
 
         NrOfObservations = 0;
 
-        Sup.LogTraceMessage($"Serial: Adding minutevalues to the averageslist...");
+        Sup.LogTraceMessage($"Serial: Adding minutevalues to the averageslists...");
 
         if (PM25_last_1_hourList.Count == 60) PM25_last_1_hourList.RemoveAt(PM25_last_1_hourList.Count - 1);
         PM25_last_1_hourList.Add(MinuteValues.Pm25_atm);

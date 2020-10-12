@@ -31,9 +31,9 @@ namespace zeroWsensors
 
   public class SHT31data
   {
-    public double Temperature { get; set; }
+    public double TemperatureF { get; set; }    // in Fahrenheit
+    public double TemperatureC { get; set; }    // in Celsius
     public double Humidity { get; set; }
-    public bool Valid;
   }
 
   class I2C
@@ -127,27 +127,21 @@ namespace zeroWsensors
         Sup.LogTraceMessage($"SHT31 read data...{Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
 
         thisReading.Humidity = 100 * (double)(Response[3] * 0x100 + Response[4]) / 65535;             // BitConverter.ToUInt16(Response, 3) / 65535;
-        thisReading.Temperature = -49 + 315 * (double)(Response[0] * 0x100 + Response[1]) / 65535;    // Must be in Fahrenheit for the Davis simulation
-        // thisReading.Temperature = -45 + 175 * (double)(Response[0] * 0x100 + Response[1]) / 65535; // This is the same in Celsius
-        thisReading.Valid = true;
+        thisReading.TemperatureF = -49 + 315 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // Must be in Fahrenheit for the Davis simulation
+        thisReading.TemperatureC = -45 + 175 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // This is the same in Celsius
 
         SHT31current = thisReading;
-
-        return;
       }
       catch (InvalidOperationException e)
       {
         Sup.LogDebugMessage($"SHT31 Exception:...{e.Message}");
-        Sup.LogTraceMessage($"SHT31 Exception result...{Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
-        thisReading.Valid = false;
-
-        return;
       }
       catch (Exception e)
       {
         Sup.LogDebugMessage($"SHT31 Exception:...{e.Message}");
-        // Continue
       }
+
+      return;
     }
 
     private void StopSHT31()
@@ -211,7 +205,6 @@ namespace zeroWsensors
         PrintRow(i);
       }
     }
-    #endregion
 
     private void PrintRow(int rowId)
     {
@@ -229,5 +222,8 @@ namespace zeroWsensors
 
       Sup.LogDebugMessage(row);
     }
+
+    #endregion
+
   }
 }

@@ -77,7 +77,7 @@ namespace zeroWsensors
       {
         Sup.LogDebugMessage($"Webserver: Start Exception - {e.Message}");
         Stop();
-        // Continue ?? or exit - Let's continue for the time being
+        // Continue ?? or exit - Let's continue for the time being, server is not operational and thus no connection to CMX
       }
     }
 
@@ -181,14 +181,14 @@ namespace zeroWsensors
       sb.AppendLine("    \"conditions\":[ {");
       sb.AppendLine("        \"lsid\":000000,");
       sb.AppendLine("        \"data_structure_type\":6,");
-      sb.AppendLine($"        \"temp\":{thisI2C.SHT31current.Temperature:F1},");
+      sb.AppendLine($"        \"temp\":{thisI2C.SHT31current.TemperatureF:F1},");   // Send the temp in the required Fahrenheit
       sb.AppendLine($"        \"hum\":{thisI2C.SHT31current.Humidity:F1},");
-      sb.AppendLine($"        \"dew_point\":-1,");
+      sb.AppendLine("        \"dew_point\":-1,");
       sb.AppendLine($"        \"wet_bulb\":-1,");
-      sb.AppendLine($"        \"heat_index\":-1,");
-      sb.AppendLine($"        \"pm_1_last\":-1,");
-      sb.AppendLine($"        \"pm_2p5_last\":-1,");
-      sb.AppendLine($"        \"pm_10_last\":-1,");
+      sb.AppendLine("        \"heat_index\":-1,");
+      sb.AppendLine("        \"pm_1_last\":-1,");
+      sb.AppendLine("        \"pm_2p5_last\":-1,");
+      sb.AppendLine("        \"pm_10_last\":-1,");
       sb.AppendLine($"        \"pm_1\":{thisSerial.MinuteValues.Pm1_atm:F2},");
       sb.AppendLine($"        \"pm_2p5\":{thisSerial.MinuteValues.Pm25_atm:F2},");
       sb.AppendLine($"        \"pm_2p5_last_1_hour\":{thisSerial.PM25_last_1_hourList.Average():F2},");
@@ -221,6 +221,7 @@ namespace zeroWsensors
       Stream OutputStream = Response.OutputStream;
       OutputStream.Write(bOutput, 0, bOutput.Length);
       OutputStream.Close();
+      Response.Close();
     }
   }// Class Webserver
 }// Namespace

@@ -5,8 +5,8 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <StartupObject>zeroWsensors.Program</StartupObject>
     <Authors>Hans Rottier</Authors>
-    <Version>0.1.0</Version>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <Version>0.1.1</Version>
+    <AssemblyVersion>0.1.1.0</AssemblyVersion>
     <PackageId>CUSensorArray</PackageId>
     <Product>CUSensorArray</Product>
     <Copyright>Hans Rottier</Copyright>
