@@ -68,8 +68,15 @@
 //      https://www.hindawi.com/journals/js/2018/5096540/
 //
 // Davis AirLink things:
-//      https://digitalrune.github.io/DigitalRune-Documentation/html/81cd4f27-5ce5-4439-9a6c-121f2942f175.htm //Exponential smoothing (the _nowcast values)
 //      https://weatherlink.github.io/airlink-local-api/
+//  Documentation on the calculations is found here:
+//  USA:
+//      https://www.airnow.gov/faqs/how-nowcast-algorithm-used-report/
+//      https://www.airnow.gov/sites/default/files/2020-05/aqi-technical-assistance-document-sept2018.pdf
+//      https://www.epa.gov/air-sensor-toolbox
+//      https://en.wikipedia.org/wiki/NowCast_(air_quality_index)
+//
+
 //
 
 using System;
@@ -81,14 +88,30 @@ using System.Threading;
 namespace zeroWsensors
 {
   // Clock definitions
-  class Program
+  public class Program
   {
+    public static TraceSwitch CUSensorsSwitch;
+
+    Support Sup;
+    I2C thisI2C;
+    Serial thisSerial;
+    WebServer thisWebserver;
+
+    bool Continue = true;
+
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0063:Use simple 'using' statement", Justification = "<Pending>")]
     static void Main() // string[] args
     {
+
+      Program p = new Program();
+      p.RealMain();
+    }
+
+    void RealMain()
+    {
       #region Init
+
       // Do the logging setup
-      //
       //if (!Directory.Exists("log")) Directory.CreateDirectory("log");
 
       //string[] files = Directory.GetFiles("log");
@@ -103,11 +126,13 @@ namespace zeroWsensors
       CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 
       //log/{DateTime.Now.ToString("yyMMddHHmm", CultureInfo.InvariantCulture)}
+      CUSensorsSwitch = new TraceSwitch("CUSensorsSwitch", "Tracing switch for CUSensors");
       Trace.Listeners.Add(new TextWriterTraceListener("sensors.log"));
       Trace.AutoFlush = true;
+      Sup = new Support();
 
-      // The only time Support is instantiated; Can't be in the different classes
-      Support Sup = new Support();
+      Console.CancelKeyPress += new ConsoleCancelEventHandler(CtrlCHandler);
+
       #endregion
 
       Sup.LogDebugMessage(message: "ZeroWsensors : ----------------------------");
@@ -123,42 +148,27 @@ namespace zeroWsensors
         "This program comes with ABSOLUTELY NO WARRANTY;\n" +
         "This is free software, and you are welcome to redistribute it under certain conditions.");
 
-      // So, here we go...
-      I2C thisI2C = new I2C(Sup);
-      Serial thisSerial = new Serial(Sup);
-      WebServer thisWebserver = new WebServer(Sup, thisI2C, thisSerial);
-      thisWebserver.Start(WebServer.urlCumulus);
-
-      #region CtrlC-Handler
-      // Now set the handler and do the processing
-      //
-      bool Continue = true;
-
-      Console.CancelKeyPress += delegate {
-        Sup.LogDebugMessage("SensorArray Gracefull exit... Begin");
-
-        // Don't understand why this does not call the destructor but anyway...
-        // It now works without the need to reinitialise the sensor.
-        thisI2C.StopI2C();
-        thisSerial.PMS1003Stop();
-        thisWebserver.Stop();
-
-        Continue = false;
-      };
-
-      #endregion
 
       #region MainLoop
+
+      // So, here we go...
+      thisI2C = new I2C(Sup);
+      thisSerial = new Serial(Sup);
+      thisWebserver = new WebServer(Sup, thisI2C, thisSerial);
+      thisWebserver.Start(WebServer.urlCumulus);
+
 
       using (StreamWriter of = new StreamWriter("CUSensorArray.txt", true))
       {
         int Clock = 0;
         string thisLine = "";
 
+        CUSensorsSwitch.Level = TraceLevel.Error;
+
         do
         {
           // Do this condional because the ctrl-c interrupt can be given aanywhere.
-          Sup.LogTraceMessage(message: "ZeroWsensors : Getting sensor values from the Main 10 second loop");
+          Sup.LogTraceInfoMessage(message: "ZeroWsensors : Getting sensor values from the Main 10 second loop");
 
           if (Continue) thisSerial.DoPMS1003();
           if (Continue) thisI2C.DoI2C();
@@ -188,9 +198,79 @@ namespace zeroWsensors
       Trace.Flush();
       Trace.Close();
 
-      Thread.Sleep(1000); // Give some time to wind down all obligations
+      // Thread.Sleep(1000); // Give some time to wind down all obligations
 
       return;
-    } // main()
+    } // Real main()
+
+    #region CtrlC-Handler
+    // Now set the handler and do the processing
+    //
+    void CtrlCHandler(object sender, ConsoleCancelEventArgs args)
+    {
+      Sup.LogDebugMessage("SensorArray Gracefull exit... Begin");
+
+      ConsoleSpecialKey Key = args.SpecialKey;
+      Sup.LogDebugMessage($"Key Pressed: {Key}");
+      Console.WriteLine($"Key Pressed: {Key}");
+
+      switch (Key)
+      {
+        case ConsoleSpecialKey.ControlBreak:
+          // Do not immedialtely stop the process.
+          args.Cancel = true;
+
+          //switch (CUSensorsSwitch.Level)
+          //{
+          //  case TraceLevel.Off:
+          //    CUSensorsSwitch.Level = TraceLevel.Error;
+          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+          //    break;
+          //  case TraceLevel.Error:
+          //    CUSensorsSwitch.Level = TraceLevel.Warning;
+          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+          //    break;
+          //  case TraceLevel.Warning:
+          //    CUSensorsSwitch.Level = TraceLevel.Info;
+          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+          //    break;
+          //  case TraceLevel.Info:
+          //    CUSensorsSwitch.Level = TraceLevel.Verbose;
+          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+          //    break;
+          //  case TraceLevel.Verbose:
+          //    CUSensorsSwitch.Level = TraceLevel.Off;
+          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+          //    break;
+          //  default:
+          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+          //    break;
+          //}
+          break;
+
+        case ConsoleSpecialKey.ControlC:
+          thisI2C.StopI2C();
+          thisSerial.PMS1003Stop();
+          thisWebserver.Stop();
+          args.Cancel = true;                                     // Do not immedialtely stop the process, handle it by the Continue loop control boolean.
+          Continue = false;
+          break;
+
+        default:
+          // Should be impossible
+          break;
+      }
+
+      return;
+    }
+
+    #endregion
+
   } // Class Program
 } // Namespace zeroWsensors

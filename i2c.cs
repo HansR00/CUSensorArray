@@ -90,7 +90,7 @@ namespace zeroWsensors
     // Fix this for general behaviour with more I2C sensors -> create a list of devices with their results?
     public void DoI2C()
     {
-      Sup.LogTraceMessage("DoI2C public routine");
+      Sup.LogTraceInfoMessage("DoI2C public routine");
       if (SHT31present)
       {
         DoSHT31();
@@ -113,7 +113,7 @@ namespace zeroWsensors
     {
       SHT31data thisReading = new SHT31data();
 
-      Sup.LogTraceMessage("DoSHT31 main routine entry");
+      Sup.LogTraceInfoMessage("DoSHT31 main routine entry");
 
       try
       {
@@ -124,7 +124,7 @@ namespace zeroWsensors
         }
 
         // For debugging, normally not on
-        Sup.LogTraceMessage($"SHT31 read data...{Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
+        Sup.LogTraceInfoMessage($"SHT31 read data...{Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
 
         thisReading.Humidity = 100 * (double)(Response[3] * 0x100 + Response[4]) / 65535;             // BitConverter.ToUInt16(Response, 3) / 65535;
         thisReading.TemperatureF = -49 + 315 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // Must be in Fahrenheit for the Davis simulation
@@ -134,11 +134,11 @@ namespace zeroWsensors
       }
       catch (InvalidOperationException e)
       {
-        Sup.LogDebugMessage($"SHT31 Exception:...{e.Message}");
+        Sup.LogTraceWarningMessage($"SHT31 Exception:...{e.Message}");
       }
       catch (Exception e)
       {
-        Sup.LogDebugMessage($"SHT31 Exception:...{e.Message}");
+        Sup.LogTraceWarningMessage($"SHT31 Exception:...{e.Message}");
       }
 
       return;
@@ -146,7 +146,7 @@ namespace zeroWsensors
 
     private void StopSHT31()
     {
-      Sup.LogDebugMessage("SHT31 Stop");
+      Sup.LogTraceInfoMessage("SHT31 Stop");
 
       // Get and display the status before exiting
       lock (Response)
@@ -160,7 +160,7 @@ namespace zeroWsensors
       //Sup.LogDebugMessage("15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00");
 
       //Console.WriteLine($"StatusWord : {Convert.ToString((ushort)(Response[0] * 256 + Response[1]), toBase: 2)} ");
-      Sup.LogDebugMessage($"StatusWord : {Convert.ToString((ushort)(Response[0] * 256 + Response[1]), toBase: 2)} ");
+      Sup.LogTraceInfoMessage($"StatusWord : {Convert.ToString((ushort)(Response[0] * 256 + Response[1]), toBase: 2)} ");
     }
 
 

@@ -33,7 +33,9 @@ namespace zeroWsensors
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Justification = "<Pending>")]
     public void LogDebugMessage(string message) => Debug.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
-    public void LogTraceMessage(string message) => Trace.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
+    public void LogTraceErrorMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceError, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
+    public void LogTraceWarningMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceWarning, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
+    public void LogTraceInfoMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceInfo, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
 
     #endregion
 
@@ -80,7 +82,7 @@ namespace zeroWsensors
         _ver = string.Format(CultureInfo.InvariantCulture, $"CUSensorArray - Version {_ver} " +
                              $"- Started at {DateTime.Now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}");
 
-        this.LogTraceMessage($"Support: {_ver}");
+        this.LogTraceInfoMessage($"Support: {_ver}");
       }
 
       return _ver;

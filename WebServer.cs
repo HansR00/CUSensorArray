@@ -75,7 +75,7 @@ namespace zeroWsensors
       }
       catch (Exception e) when (e is HttpListenerException || e is ObjectDisposedException )
       {
-        Sup.LogDebugMessage($"Webserver: Start Exception - {e.Message}");
+        Sup.LogTraceWarningMessage($"Webserver: Start Exception - {e.Message}");
         Stop();
         // Continue ?? or exit - Let's continue for the time being, server is not operational and thus no connection to CMX
       }
@@ -95,14 +95,14 @@ namespace zeroWsensors
         }
         catch(Exception e)
         {
-          Sup.LogDebugMessage($"Webserver: Stop Exception - {e.Message}");
+          Sup.LogTraceWarningMessage($"Webserver: Stop Exception - {e.Message}");
         }
       }
     }
 
     protected void WebRequestCallback(IAsyncResult result)
     {
-      Sup.LogTraceMessage("Webserver: WebRequestCallback");
+      Sup.LogTraceInfoMessage("Webserver: WebRequestCallback");
 
       if (this.Listener == null) return;
 
@@ -160,18 +160,18 @@ namespace zeroWsensors
        * 
        */
 
-      Sup.LogTraceMessage("Webserver: ProcessRequest");
+      Sup.LogTraceInfoMessage("Webserver: ProcessRequest");
 
       HttpListenerRequest Request = Context.Request;
       HttpListenerResponse Response = Context.Response;
       StringBuilder sb = new StringBuilder();
 
-      Sup.LogTraceMessage(Request.HttpMethod + " " + Request.RawUrl + " Http/" + Request.ProtocolVersion.ToString());
-      if (Request.UrlReferrer != null) Sup.LogTraceMessage("Referer: " + Request.UrlReferrer);
-      if (Request.UserAgent != null) Sup.LogTraceMessage("User-Agent: " + Request.UserAgent);
+      Sup.LogTraceInfoMessage(Request.HttpMethod + " " + Request.RawUrl + " Http/" + Request.ProtocolVersion.ToString());
+      if (Request.UrlReferrer != null) Sup.LogTraceInfoMessage("Referer: " + Request.UrlReferrer);
+      if (Request.UserAgent != null) Sup.LogTraceInfoMessage("User-Agent: " + Request.UserAgent);
 
       for (int x = 0; x < Request.Headers.Count; x++)
-        Sup.LogTraceMessage("Request header: " + Request.Headers.Keys[x] + ":" + " " + Request.Headers[x]);
+        Sup.LogTraceInfoMessage("Request header: " + Request.Headers.Keys[x] + ":" + " " + Request.Headers[x]);
 
       sb.AppendLine("{");
       sb.AppendLine("  \"data\":{");
@@ -194,17 +194,17 @@ namespace zeroWsensors
       sb.AppendLine($"        \"pm_2p5_last_1_hour\":{thisSerial.PM25_last_1_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_2p5_last_3_hours\":{thisSerial.PM25_last_3_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_2p5_last_24_hours\":{thisSerial.PM25_last_24_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_2p5_nowcast\":{-1:F1},");
+      sb.AppendLine($"        \"pm_2p5_nowcast\":{thisSerial.NowCast25:F2},");
       sb.AppendLine($"        \"pm_10\":{thisSerial.MinuteValues.Pm10_atm:F2},");
       sb.AppendLine($"        \"pm_10_last_1_hour\":{thisSerial.PM10_last_1_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_10_last_3_hours\":{thisSerial.PM10_last_3_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_10_last_24_hours\":{thisSerial.PM10_last_24_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_10_nowcast\":{-1:F1},");
+      sb.AppendLine($"        \"pm_10_nowcast\":{thisSerial.NowCast10:F1},");
       sb.AppendLine($"        \"last_report_time\":{DateTimeOffset.Now.ToUnixTimeSeconds()},");
       sb.AppendLine($"        \"pct_pm_data_last_1_hour\":{thisSerial.PM25_last_1_hourList.Count / 60.0 * 100:F0},"); // / 60 * 100
       sb.AppendLine($"        \"pct_pm_data_last_3_hours\":{thisSerial.PM25_last_3_hourList.Count / (3 * 60.0) * 100:F0},"); // / (3 * 60) * 100
       sb.AppendLine($"        \"pct_pm_data_last_24_hours\":{thisSerial.PM25_last_24_hourList.Count / (24 * 60.0) * 100:F0},"); // / (24 * 60) * 100
-      sb.AppendLine($"        \"pct_pm_data_nowcast\":0");
+      sb.AppendLine($"        \"pct_pm_data_nowcast\":{thisSerial.PM25_last_24_hourList.Count / (12 * 60.0) * 100:F0},"); // / (12 * 60) * 100");
       sb.AppendLine("      } ]");  // End Of Conditions
       sb.AppendLine("    },"); // End of Data
       sb.AppendLine("    \"error\":null");
@@ -212,7 +212,7 @@ namespace zeroWsensors
 
       string Output = sb.ToString();
 
-      Sup.LogTraceMessage($"Webserver: Response: {Output}");
+      Sup.LogTraceInfoMessage($"Webserver: Response: {Output}");
 
       byte[] bOutput = System.Text.Encoding.UTF8.GetBytes(Output);
       Response.ContentType = "application/json";
