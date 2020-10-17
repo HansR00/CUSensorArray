@@ -29,6 +29,8 @@ namespace zeroWsensors
   // Reference: 1) https://blog.mrgibbs.io/using-i2c-on-the-raspberry-pi-with-c/
   //            2) https://jeremylindsayni.wordpress.com/2017/05/08/using-net-core-2-to-read-from-an-i2c-device-connected-to-a-raspberry-pi-3-with-ubuntu-16-04/
 
+  public enum TempSensorsSupported : int { SHT31 }
+
   public class SHT31data
   {
     public double TemperatureF { get; set; }    // in Fahrenheit
@@ -36,7 +38,7 @@ namespace zeroWsensors
     public double Humidity { get; set; }
   }
 
-  class I2C
+  public class I2C
   {
     public volatile SHT31data SHT31current = new SHT31data();
 

@@ -23,19 +23,67 @@
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Text;
 
 namespace zeroWsensors
 {
-  class Support
+  public class Support
   {
+    private readonly IniFile CUSensorIni;
+
+    #region Init
+    public Support()
+    {
+      // Do the logging setup
+      if (!Directory.Exists("log")) Directory.CreateDirectory("log");
+
+      string[] files = Directory.GetFiles("log");
+      
+      if (files.Length >= 10)
+      {
+        foreach (string file in files)
+        {
+          FileInfo fi = new FileInfo(file);
+          if (DateTime.Now.Subtract(fi.LastWriteTime).TotalDays > 30 ) fi.Delete();
+        }
+      }
+
+      // So the ini start
+      CUSensorIni = new IniFile(this, "CUSensorArray.ini");
+    }
+
+    #endregion
+
     #region Diagnostics
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Justification = "<Pending>")]
     public void LogDebugMessage(string message) => Debug.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
-    public void LogTraceErrorMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceError, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
-    public void LogTraceWarningMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceWarning, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
-    public void LogTraceInfoMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceInfo, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
+    public void LogTraceErrorMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceError, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Error " + message);
+    public void LogTraceWarningMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceWarning, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Warning " + message);
+    public void LogTraceInfoMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceInfo, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Information " + message);
+    public void LogTraceVerboseMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceVerbose, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Verbose " + message);
+
+    #endregion
+
+    #region Ini
+
+    public string GetSensorsIniValue(string section, string key, string def) => CUSensorIni.GetValue(section, key, def);
+    public void SetSensorsIniValue(string section, string key, string def) => CUSensorIni.SetValue(section, key, def);
+
+    #endregion
+
+    #region VersionCopyright
+    public string Version()
+    {
+      string tmp;
+
+      tmp = typeof(Support).Assembly.GetName().Version.Major + "." + typeof(Support).Assembly.GetName().Version.Minor + "." + typeof(Support).Assembly.GetName().Version.Build;
+
+      return string.Format(CultureInfo.InvariantCulture, $"CUSensorArray - Version {tmp} - Started at {DateTime.Now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}");
+    }
+
+    public string Copyright => "© Hans Rottier";
 
     #endregion
 
@@ -57,7 +105,7 @@ namespace zeroWsensors
       StringBuilder bitBuilder = new StringBuilder(b.Length * 2);
       bitBuilder.Append("Bitstring DHT22 : ");
 
-      for(int i=0; i<40; i++)
+      for (int i = 0; i < 40; i++)
       {
         if (b[i]) bitBuilder.Append("1");
         else bitBuilder.Append("0");
@@ -66,35 +114,7 @@ namespace zeroWsensors
 
       return bitBuilder.ToString();
     }
-#endregion
+    #endregion
 
-    #region VersionCopyright
-    public string Version()
-    {
-      string _ver = "";
-
-      if (string.IsNullOrEmpty(_ver))
-      {
-        _ver = typeof(Support).Assembly.GetName().Version.Major.ToString(CultureInfo.InvariantCulture) + "." +
-                     typeof(Support).Assembly.GetName().Version.Minor.ToString(CultureInfo.InvariantCulture) + "." +
-                     typeof(Support).Assembly.GetName().Version.Build.ToString(CultureInfo.InvariantCulture);
-
-        _ver = string.Format(CultureInfo.InvariantCulture, $"CUSensorArray - Version {_ver} " +
-                             $"- Started at {DateTime.Now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}");
-
-        this.LogTraceInfoMessage($"Support: {_ver}");
-      }
-
-      return _ver;
-    }
-
-    public string Copyright() => "© Hans Rottier";
-    //{
-    //  string _copyRight = 
-    //  return _copyRight;
-    //}
-
-#endregion
-
-  }
-}
+  } // Class
+} // Namespace

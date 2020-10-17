@@ -80,9 +80,11 @@
 //
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace zeroWsensors
@@ -90,19 +92,20 @@ namespace zeroWsensors
   // Clock definitions
   public class Program
   {
-    public static TraceSwitch CUSensorsSwitch;
+    public static TraceSwitch CUSensorsSwitch { get; set; }
+    public static bool AirLinkEmulation { get; set; }
 
     Support Sup;
     I2C thisI2C;
     Serial thisSerial;
+    EmulateAirLink thisEmulator;
     WebServer thisWebserver;
 
     bool Continue = true;
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0063:Use simple 'using' statement", Justification = "<Pending>")]
-    static void Main() // string[] args
+    private static void Main() // string[] args
     {
-
       Program p = new Program();
       p.RealMain();
     }
@@ -111,35 +114,57 @@ namespace zeroWsensors
     {
       #region Init
 
-      // Do the logging setup
-      //if (!Directory.Exists("log")) Directory.CreateDirectory("log");
-
-      //string[] files = Directory.GetFiles("log");
-
-      //foreach (string file in files)
-      //{
-      //  FileInfo fi = new FileInfo(file);
-      //  if (fi.CreationTime < DateTime.Now.AddDays(-2)) fi.Delete();
-      //}
-
-      // And set the thread culture to invariant
-      CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
-
-      //log/{DateTime.Now.ToString("yyMMddHHmm", CultureInfo.InvariantCulture)}
-      CUSensorsSwitch = new TraceSwitch("CUSensorsSwitch", "Tracing switch for CUSensors");
-      Trace.Listeners.Add(new TextWriterTraceListener("sensors.log"));
-      Trace.AutoFlush = true;
+      // Setup logging and Ini
       Sup = new Support();
 
       Console.CancelKeyPress += new ConsoleCancelEventHandler(CtrlCHandler);
+      CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+
+      Trace.Listeners.Add(new TextWriterTraceListener($"log/{DateTime.Now.ToString("yyMMddHHmm", CultureInfo.InvariantCulture)}sensors.log"));
+      Trace.AutoFlush = true;
+      CUSensorsSwitch = new TraceSwitch("CUSensorsSwitch", "Tracing switch for CUSensors")
+      {
+        Level = TraceLevel.Verbose
+      };
+
+      Sup.LogDebugMessage($"Initial {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
+
+      AirLinkEmulation = Sup.GetSensorsIniValue("General", "AirLinkEmulation", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+      string thisTrace = Sup.GetSensorsIniValue("General", "TraceInfo", "Warning");   // Verbose, Information, Warning, Error, Off
+
+      // Now set the Trace level to the wanted value
+      switch( thisTrace.ToLower() )
+      {
+        case "error":
+          CUSensorsSwitch.Level = TraceLevel.Error;
+          break;
+
+        case "warning":
+          CUSensorsSwitch.Level = TraceLevel.Warning;
+          break;
+
+        case "information":
+          CUSensorsSwitch.Level = TraceLevel.Info;
+          break;
+
+        case "verbose":
+          CUSensorsSwitch.Level = TraceLevel.Verbose;
+          break;
+
+        default:
+          CUSensorsSwitch.Level = TraceLevel.Off;
+          break;
+      }
+
+      Sup.LogDebugMessage($"According to Inifile {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
 
       #endregion
 
       Sup.LogDebugMessage(message: "ZeroWsensors : ----------------------------");
       Sup.LogDebugMessage(message: "ZeroWsensors : Entering Main");
 
-      Console.WriteLine($"{Sup.Version()} {Sup.Copyright()}");
-      Sup.LogDebugMessage($"{Sup.Version()} {Sup.Copyright()}");
+      Console.WriteLine($"{Sup.Version()} {Sup.Copyright}");
+      Sup.LogDebugMessage($"{Sup.Version()} {Sup.Copyright}");
 
       Console.WriteLine("CUSensorArray - Copyright (C) 2020  Hans Rottier\n" +
         "This program comes with ABSOLUTELY NO WARRANTY;\n" +
@@ -154,41 +179,64 @@ namespace zeroWsensors
       // So, here we go...
       thisI2C = new I2C(Sup);
       thisSerial = new Serial(Sup);
-      thisWebserver = new WebServer(Sup, thisI2C, thisSerial);
-      thisWebserver.Start(WebServer.urlCumulus);
 
+      if (AirLinkEmulation)
+      {
+        // Only do the emulator and Webserver if it is asked for (default = false)!!
+        //
+        thisEmulator = new EmulateAirLink(Sup, thisSerial);
+        thisWebserver = new WebServer(Sup, thisI2C, thisSerial, thisEmulator);
+        thisWebserver.Start();
+      }
 
+      // Start the loop
       using (StreamWriter of = new StreamWriter("CUSensorArray.txt", true))
       {
         int Clock = 0;
         string thisLine = "";
-
-        CUSensorsSwitch.Level = TraceLevel.Error;
 
         do
         {
           // Do this condional because the ctrl-c interrupt can be given aanywhere.
           Sup.LogTraceInfoMessage(message: "ZeroWsensors : Getting sensor values from the Main 10 second loop");
 
-          if (Continue) thisSerial.DoPMS1003();
-          if (Continue) thisI2C.DoI2C();
-
-          Clock++;
-
-          if (Clock == 6)
+          if (Continue)
           {
-            thisLine = $"{thisI2C.SHT31current.TemperatureC:F1};{thisI2C.SHT31current.Humidity:F0};" +
-              // $"{thisSerial.MinuteValues.Pm1_stand:F1};{thisSerial.MinuteValues.Pm25_stand:F1};{thisSerial.MinuteValues.Pm10_stand:F1};" +
-              $"{thisSerial.MinuteValues.Pm1_atm:F1};{thisSerial.MinuteValues.Pm25_atm:F1};{thisSerial.MinuteValues.Pm10_atm:F1};";
+            thisSerial.DoSerial();
+            thisI2C.DoI2C();
 
-            of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm};{thisLine}");
-            of.Flush();
+            Clock++;
 
-            Clock = 0;
+            // So we came here 6 times every 10 seconds. Create the minute values and remove the existing list, create a new one
+            // The average values are always real averages even if some fetches failed in which case the list is shorter 
+            // This is the basic work of the sensor handler: fetch data and write to local logfile
+
+            if (Clock == 6)
+            {
+              Clock = 0;
+
+              Sup.LogTraceInfoMessage($"Serial: Creating minutevalues as average of the 10 second observations...");
+              thisSerial.Sensor.MinuteValues.Pm1_atm = thisSerial.Sensor.ObservationList.Select(x => x.Pm1_atm).Average();
+              thisSerial.Sensor.MinuteValues.Pm25_atm = thisSerial.Sensor.ObservationList.Select(x => x.Pm25_atm).Average();
+              thisSerial.Sensor.MinuteValues.Pm10_atm = thisSerial.Sensor.ObservationList.Select(x => x.Pm10_atm).Average();
+
+              thisSerial.Sensor.ObservationList = new List<PMSensordata>();  // The old list disappears through the garbage collector.
+
+              thisLine = $"{thisI2C.SHT31current.TemperatureC:F1};{thisI2C.SHT31current.Humidity:F0};" +
+                $"{thisSerial.Sensor.MinuteValues.Pm1_atm:F1};{thisSerial.Sensor.MinuteValues.Pm25_atm:F1};{thisSerial.Sensor.MinuteValues.Pm10_atm:F1};";
+              of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm};{thisLine}");
+              of.Flush();
+
+              // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
+              // all other necessary lists and calculated values from there
+
+              if (AirLinkEmulation) thisEmulator.DoAirLink();
+            }
           }
 
+          // This is really hardcoded and should NOT change. The whole thing sis based on 6 measurements per minute, so loop every 10 seconds
           Thread.Sleep(10000);
-        } while (Continue); // while
+        } while (Continue); // Do-While
       } // Using the datafile
 
       #endregion
@@ -197,8 +245,6 @@ namespace zeroWsensors
 
       Trace.Flush();
       Trace.Close();
-
-      // Thread.Sleep(1000); // Give some time to wind down all obligations
 
       return;
     } // Real main()
@@ -211,11 +257,13 @@ namespace zeroWsensors
       Sup.LogDebugMessage("SensorArray Gracefull exit... Begin");
 
       ConsoleSpecialKey Key = args.SpecialKey;
-      Sup.LogDebugMessage($"Key Pressed: {Key}");
-      Console.WriteLine($"Key Pressed: {Key}");
+      //Sup.LogDebugMessage($"Key Pressed: {Key}");
+      //Console.WriteLine($"Key Pressed: {Key}");
 
       switch (Key)
       {
+        // Maybe some time I do a Signal base dynamic errorlevel setting
+        // but ctrl-break does  not work on my machine
         case ConsoleSpecialKey.ControlBreak:
           // Do not immedialtely stop the process.
           args.Cancel = true;
@@ -256,7 +304,7 @@ namespace zeroWsensors
 
         case ConsoleSpecialKey.ControlC:
           thisI2C.StopI2C();
-          thisSerial.PMS1003Stop();
+          thisSerial.SerialStop();
           thisWebserver.Stop();
           args.Cancel = true;                                     // Do not immedialtely stop the process, handle it by the Continue loop control boolean.
           Continue = false;

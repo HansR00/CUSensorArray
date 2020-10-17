@@ -36,40 +36,42 @@ namespace zeroWsensors
 
   public delegate void delReceiveWebRequest(HttpListenerContext Context);
 
-  class WebServer
+  public class WebServer
   {
     readonly Support Sup;
     readonly I2C thisI2C;
     readonly Serial thisSerial;
+    readonly EmulateAirLink thisAirLink;
 
     protected HttpListener Listener;
     protected bool IsStarted = false;
 
     public event delReceiveWebRequest ReceiveWebRequest;
-    public const string urlCumulus = "http://+/";
+    public const string baseURL = "http://+/";
 
-    public WebServer(Support s, I2C i, Serial se)
+    public WebServer(Support s, I2C i, Serial se, EmulateAirLink emu)
     {
       Sup = s;
       thisI2C = i;
       thisSerial = se;
+      thisAirLink = emu;
     }
 
-    public void Start(string UrlBase)
+    public void Start() // old  parameter: string UrlBase
     {
-      Sup.LogDebugMessage($"Webserver: Start - connecting to {UrlBase}");
+      Sup.LogDebugMessage($"Webserver: Start - connecting to {baseURL}");
 
       // *** Already running - just leave it in place
       if (this.IsStarted) return;
 
       if (this.Listener == null) this.Listener = new HttpListener();
 
-      this.Listener.Prefixes.Add(UrlBase);
+      this.Listener.Prefixes.Add(baseURL);
 
       try
       {
         this.Listener.Start();
-        this.IsStarted = true;  // Should the same as Listener.IsListening ?? yeah, should use that probably
+        this.IsStarted = true;  
 
         IAsyncResult result = this.Listener.BeginGetContext(new AsyncCallback(WebRequestCallback), this.Listener);
       }
@@ -77,7 +79,6 @@ namespace zeroWsensors
       {
         Sup.LogTraceWarningMessage($"Webserver: Start Exception - {e.Message}");
         Stop();
-        // Continue ?? or exit - Let's continue for the time being, server is not operational and thus no connection to CMX
       }
     }
 
@@ -108,7 +109,7 @@ namespace zeroWsensors
 
       HttpListenerContext context = this.Listener.EndGetContext(result);
 
-      // *** Immediately set up the next context
+      // Immediately set up the next context
       this.Listener.BeginGetContext(new AsyncCallback(WebRequestCallback), this.Listener);
       this.ReceiveWebRequest?.Invoke(context);
       this.ProcessRequest(context);
@@ -184,27 +185,27 @@ namespace zeroWsensors
       sb.AppendLine($"        \"temp\":{thisI2C.SHT31current.TemperatureF:F1},");   // Send the temp in the required Fahrenheit
       sb.AppendLine($"        \"hum\":{thisI2C.SHT31current.Humidity:F1},");
       sb.AppendLine("        \"dew_point\":-1,");
-      sb.AppendLine($"        \"wet_bulb\":-1,");
+      sb.AppendLine("        \"wet_bulb\":-1,");
       sb.AppendLine("        \"heat_index\":-1,");
       sb.AppendLine("        \"pm_1_last\":-1,");
       sb.AppendLine("        \"pm_2p5_last\":-1,");
       sb.AppendLine("        \"pm_10_last\":-1,");
-      sb.AppendLine($"        \"pm_1\":{thisSerial.MinuteValues.Pm1_atm:F2},");
-      sb.AppendLine($"        \"pm_2p5\":{thisSerial.MinuteValues.Pm25_atm:F2},");
-      sb.AppendLine($"        \"pm_2p5_last_1_hour\":{thisSerial.PM25_last_1_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_2p5_last_3_hours\":{thisSerial.PM25_last_3_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_2p5_last_24_hours\":{thisSerial.PM25_last_24_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_2p5_nowcast\":{thisSerial.NowCast25:F2},");
-      sb.AppendLine($"        \"pm_10\":{thisSerial.MinuteValues.Pm10_atm:F2},");
-      sb.AppendLine($"        \"pm_10_last_1_hour\":{thisSerial.PM10_last_1_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_10_last_3_hours\":{thisSerial.PM10_last_3_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_10_last_24_hours\":{thisSerial.PM10_last_24_hourList.Average():F2},");
-      sb.AppendLine($"        \"pm_10_nowcast\":{thisSerial.NowCast10:F1},");
+      sb.AppendLine($"        \"pm_1\":{thisSerial.Sensor.MinuteValues.Pm1_atm:F2},");
+      sb.AppendLine($"        \"pm_2p5\":{thisSerial.Sensor.MinuteValues.Pm25_atm:F2},");
+      sb.AppendLine($"        \"pm_2p5_last_1_hour\":{thisAirLink.PM25_last_1_hourList.Average():F2},");
+      sb.AppendLine($"        \"pm_2p5_last_3_hours\":{thisAirLink.PM25_last_3_hourList.Average():F2},");
+      sb.AppendLine($"        \"pm_2p5_last_24_hours\":{thisAirLink.PM25_last_24_hourList.Average():F2},");
+      sb.AppendLine($"        \"pm_2p5_nowcast\":{thisAirLink.NowCast25:F2},");
+      sb.AppendLine($"        \"pm_10\":{thisSerial.Sensor.MinuteValues.Pm10_atm:F2},");
+      sb.AppendLine($"        \"pm_10_last_1_hour\":{thisAirLink.PM10_last_1_hourList.Average():F2},");
+      sb.AppendLine($"        \"pm_10_last_3_hours\":{thisAirLink.PM10_last_3_hourList.Average():F2},");
+      sb.AppendLine($"        \"pm_10_last_24_hours\":{thisAirLink.PM10_last_24_hourList.Average():F2},");
+      sb.AppendLine($"        \"pm_10_nowcast\":{thisAirLink.NowCast10:F1},");
       sb.AppendLine($"        \"last_report_time\":{DateTimeOffset.Now.ToUnixTimeSeconds()},");
-      sb.AppendLine($"        \"pct_pm_data_last_1_hour\":{thisSerial.PM25_last_1_hourList.Count / 60.0 * 100:F0},"); // / 60 * 100
-      sb.AppendLine($"        \"pct_pm_data_last_3_hours\":{thisSerial.PM25_last_3_hourList.Count / (3 * 60.0) * 100:F0},"); // / (3 * 60) * 100
-      sb.AppendLine($"        \"pct_pm_data_last_24_hours\":{thisSerial.PM25_last_24_hourList.Count / (24 * 60.0) * 100:F0},"); // / (24 * 60) * 100
-      sb.AppendLine($"        \"pct_pm_data_nowcast\":{thisSerial.PM25_last_24_hourList.Count / (12 * 60.0) * 100:F0},"); // / (12 * 60) * 100");
+      sb.AppendLine($"        \"pct_pm_data_last_1_hour\":{thisAirLink.PM25_last_1_hourList.Count / 60.0 * 100:F0},"); 
+      sb.AppendLine($"        \"pct_pm_data_last_3_hours\":{thisAirLink.PM25_last_3_hourList.Count / (3 * 60.0) * 100:F0},"); 
+      sb.AppendLine($"        \"pct_pm_data_last_24_hours\":{thisAirLink.PM25_last_24_hourList.Count / (24 * 60.0) * 100:F0},");
+      sb.AppendLine($"        \"pct_pm_data_nowcast\":{(thisAirLink.PM25_last_24_hourList.Count > 12 * 60 ? 12 * 60 : thisAirLink.PM25_last_24_hourList.Count) / (12 * 60.0) * 100:F0},");
       sb.AppendLine("      } ]");  // End Of Conditions
       sb.AppendLine("    },"); // End of Data
       sb.AppendLine("    \"error\":null");
