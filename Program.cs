@@ -76,7 +76,10 @@
 //      https://www.epa.gov/air-sensor-toolbox
 //      https://en.wikipedia.org/wiki/NowCast_(air_quality_index)
 //
-
+// Cumulus forum threads on the subject
+//      https://cumulus.hosiene.co.uk/viewtopic.php?f=40&t=17457
+//      https://cumulus.hosiene.co.uk/viewtopic.php?f=6&t=18417
+//      https://cumulus.hosiene.co.uk/viewtopic.php?f=44&t=18541
 //
 
 using System;
@@ -143,7 +146,7 @@ namespace zeroWsensors
           CUSensorsSwitch.Level = TraceLevel.Warning;
           break;
 
-        case "information":
+        case "info":
           CUSensorsSwitch.Level = TraceLevel.Info;
           break;
 

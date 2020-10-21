@@ -46,7 +46,7 @@ namespace zeroWsensors
   {
     private readonly Support Sup;
 
-    public readonly SensorDevice Sensor;
+    internal readonly SensorDevice Sensor;
 
     public Serial(Support s)
     {
@@ -136,7 +136,7 @@ namespace zeroWsensors
     } // DoPMS1003
   } // Class Serial
 
-  public class SensorDevice
+  internal class SensorDevice
   {
     readonly Support Sup;
     readonly DefinitionSerialPort Port;
