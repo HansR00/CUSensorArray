@@ -20,171 +20,129 @@
  * 
  */
 
-using System;
 using RaspberrySharp.IO.InterIntegratedCircuit;
-using RaspberrySharp.IO.GeneralPurpose;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace zeroWsensors
 {
   // Reference: 1) https://blog.mrgibbs.io/using-i2c-on-the-raspberry-pi-with-c/
   //            2) https://jeremylindsayni.wordpress.com/2017/05/08/using-net-core-2-to-read-from-an-i2c-device-connected-to-a-raspberry-pi-3-with-ubuntu-16-04/
 
-  public enum TempSensorsSupported : int { SHT31 }
+  // So far only the SHT31 is supported
+  public enum I2cSensorsSupported : int { Dummy, SHT31 }
 
-  public class SHT31data
+  #region I2cSensorData
+  public class I2cSensordata
   {
     public double TemperatureF { get; set; }    // in Fahrenheit
     public double TemperatureC { get; set; }    // in Celsius
     public double Humidity { get; set; }
   }
 
+  #endregion
+
+  #region I2C
   public class I2C
   {
-    public volatile SHT31data SHT31current = new SHT31data();
+    private readonly Support Sup;
+
+    private readonly I2cSensorDevice Sensor;
+    private readonly I2cSensorsSupported SensorUsed;
+
+    internal bool IsAirLinkSensor;
+    internal volatile I2cSensordata MinuteValues = new I2cSensordata();               // We communicate the average over the minute
+    static public List<I2cSensordata> ObservationList = new List<I2cSensordata>();    // The list to create the minutevalues
 
 
-    #region MainI2C
-
-    readonly Support Sup;
-
-    // List of Sensor addresses/presence used in this interface
-    private const int SHT31 = 0x44; bool SHT31present;
-
-    // General response  buffer, to enlarge of there are ICs which require that.
-    byte[] Response = { 0, 0, 0, 0, 0, 0, 0, 0 };
-    readonly I2cDriver ThisDriver;
-    readonly I2cDeviceConnection SHT31Connect;
-
-    // This needs to be made generic for more than one I2C sensor with their own returnvalue structures...
-    // Currently it is workable for me only (for the SHT31, address 0x44).
-    public I2C(Support s)
+    public I2C(Support s, string Name)
     {
       Sup = s;
 
-      Sup.LogDebugMessage("I2C Constructor");
+      Sup.LogDebugMessage($"I2C Constructor {Name}");
 
-      DetectSensors();
+      // Make all addresses
+      i2cAddress[(int)I2cSensorsSupported.SHT31] = 0x44;
 
-      if (SHT31present)
-      {
-        ThisDriver = new I2cDriver(ProcessorPin.Gpio02, ProcessorPin.Gpio03, false);
-        SHT31Connect = ThisDriver.Connect(SHT31); // SHT31
-      }
-    }
-
-    ~I2C()
-    {
-      Sup.LogDebugMessage("I2C Destructor");
-      //Console.WriteLine("Doing the Destructor...");
-    }
-
-    public void StopI2C()
-    {
-      Sup.LogDebugMessage("I2C Stop");
-
-      if (SHT31present)
-      {
-        StopSHT31();
-        ThisDriver.Dispose();
-      }
-    }
-
-    // Fix this for general behaviour with more I2C sensors -> create a list of devices with their results?
-    public void DoI2C()
-    {
-      Sup.LogTraceInfoMessage("DoI2C public routine");
-      if (SHT31present)
-      {
-        DoSHT31();
-      }
-
-      return;
-    }
-
-    #endregion MainI2C
-
-    #region SHT31
-
-    // List of commands for SHT31
-    readonly byte[] SHT31SoftResetCommand = { 0x30, 0xA2 }; // Soft Reset.
-    readonly byte[] SHT31ReadStatusCommand = { 0xF3, 0x2D }; // Soft Reset.
-    // readonly byte[] SHT31BreakCommand = { 0x30, 0x93 }; // Soft Reset.
-    readonly byte[] SHT31SingleShotCommand = { 0x2C, 0x0D }; // Single shot fetch; Clock stretching disabled, medium repeatability.
-
-    private void DoSHT31()
-    {
-      SHT31data thisReading = new SHT31data();
-
-      Sup.LogTraceInfoMessage("DoSHT31 main routine entry");
-
+      // Now create the actual device
       try
       {
-        lock (Response)
+        SensorUsed = (I2cSensorsSupported)Enum.Parse(typeof(I2cSensorsSupported), Name, true);
+        switch (SensorUsed)
         {
-          SHT31Connect.Write(SHT31SingleShotCommand);
-          Response = SHT31Connect.Read(6);
+          case I2cSensorsSupported.SHT31:
+            Sup.LogDebugMessage("I2C Constructor: Creating SHT31 sensor");
+            Sensor = new SHT31Device(Sup, Name);
+            break;
+          default:
+            Sup.LogDebugMessage($"I2C Constructor: I2c sensor not implemented {SensorUsed}");
+            Sensor = new DummyDevice(Sup, Name);
+            break;
         }
-
-        // For debugging, normally not on
-        Sup.LogTraceInfoMessage($"SHT31 read data...{Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
-
-        thisReading.Humidity = 100 * (double)(Response[3] * 0x100 + Response[4]) / 65535;             // BitConverter.ToUInt16(Response, 3) / 65535;
-        thisReading.TemperatureF = -49 + 315 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // Must be in Fahrenheit for the Davis simulation
-        thisReading.TemperatureC = -45 + 175 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // This is the same in Celsius
-
-        SHT31current = thisReading;
+        Sensor.Start();
       }
-      catch (InvalidOperationException e)
+      catch (Exception e) when (e is ArgumentException || e is ArgumentNullException)
       {
-        Sup.LogTraceWarningMessage($"SHT31 Exception:...{e.Message}");
+        // We arrive here if the sensor does not exist in the Enum definition
+        Sup.LogTraceErrorMessage($"I2C Constructor: Exception on parsing I2cDevice Name : {e.Message}");
+        Sup.LogTraceErrorMessage("Either an error in naming or driver not implemented.");
+        Sup.LogTraceErrorMessage("Replacing this device by a Dummy Driver. Continuing...");
+        Sensor = new DummyDevice(Sup, Name);
       }
-      catch (Exception e)
+    }// Constructor
+
+    public void Stop()
+    {
+      Sensor.Stop();
+    }
+
+    public void Start()
+    {
+      Sensor.Start();
+    }
+
+    public void DoWork()
+    {
+      Sensor.DoWork();
+    }
+
+    public void SetMinuteValuesFromObservations()
+    {
+      if (Sensor.Valid)
       {
-        Sup.LogTraceWarningMessage($"SHT31 Exception:...{e.Message}");
+        Sup.LogTraceInfoMessage($"SetMinuteValuesFromObservations: Creating minutevalues as average of the 10 second observations... {SensorUsed}");
+        MinuteValues.Humidity = ObservationList.Select(x => x.Humidity).Average();
+        MinuteValues.TemperatureC = ObservationList.Select(x => x.TemperatureC).Average();
+        MinuteValues.TemperatureF = ObservationList.Select(x => x.TemperatureF).Average();
+
+        // Renew the observationlist 
+        ObservationList = new List<I2cSensordata>();  // The old list disappears through the garbage collector.
       }
 
       return;
     }
 
-    private void StopSHT31()
-    {
-      Sup.LogTraceInfoMessage("SHT31 Stop");
+    #region Methods DetectSensors
 
-      // Get and display the status before exiting
-      lock (Response)
-      {
-        SHT31Connect.Write(SHT31ReadStatusCommand);
-        Response = SHT31Connect.Read(3);
-        SHT31Connect.Write(SHT31SoftResetCommand);
-      }
+    // NOTE: This belongs to the I2C class logically but it is called on program level because it only needed once at initialisation
+    // List of Sensor addresses/presence used in this interface
+    static public int[] i2cAddress = new int[Enum.GetNames(typeof(I2cSensorsSupported)).Length];
+    static public bool[] i2cAddressDetected = new bool[Enum.GetNames(typeof(I2cSensorsSupported)).Length];
 
-      //Console.WriteLine("15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00");
-      //Sup.LogDebugMessage("15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00");
+    static private readonly int _rows = 8;
+    static private readonly int _cols = 16;
+    static private readonly byte[,] _nDevices = new byte[_rows, _cols];
+    static private I2cDetect _I2CDetect;
 
-      //Console.WriteLine($"StatusWord : {Convert.ToString((ushort)(Response[0] * 256 + Response[1]), toBase: 2)} ");
-      Sup.LogTraceInfoMessage($"StatusWord : {Convert.ToString((ushort)(Response[0] * 256 + Response[1]), toBase: 2)} ");
-    }
-
-
-    #endregion SHT31
-
-    #region DetectSensors
-    static readonly int _rows = 8;
-    static readonly int _cols = 16;
-    static readonly byte[,] _nDevices = new byte[_rows, _cols];
-    static I2cDetect _I2CDetect;
-
-    public void DetectSensors()
+    static public void DetectSensors(Support Sup)
     {
       Sup.LogDebugMessage("I2C Detect");
       Sup.LogDebugMessage("===============");
 
       _I2CDetect = new I2cDetect();
       var list = _I2CDetect.Detect();
-      //List<byte> list = new List<byte>();
-      //list.Add(15);
-      //list.Add(33);
-      //list.Add(3);
+
       foreach (var i2c in list)
       {
         int r = i2c / 16;
@@ -192,10 +150,13 @@ namespace zeroWsensors
         _nDevices[r, c] = 1;
 
         // Check if the devices we want are present
-        if (i2c == SHT31)
+        for (int i = 0; i < i2cAddress.Length; i++)
         {
-          Sup.LogDebugMessage($"DetectSensors: found {i2c:x2} (SHT31)");
-          SHT31present = true;
+          if (i2c == i2cAddress[i])
+          {
+            i2cAddressDetected[i] = true;
+            Sup.LogDebugMessage($"DetectSensors: found {Enum.GetName(typeof(I2cSensorsSupported), i)} at {i2c:x2}  ");
+          }
         }
       }
 
@@ -204,11 +165,11 @@ namespace zeroWsensors
 
       for (int i = 0; i < _rows; i++)
       {
-        PrintRow(i);
+        PrintRow(i, Sup);
       }
     }
 
-    private void PrintRow(int rowId)
+    static private void PrintRow(int rowId, Support Sup)
     {
       string row = string.Format("{0:00}: ", rowId);
       for (int i = 0; i < _cols; i++)
@@ -226,6 +187,131 @@ namespace zeroWsensors
     }
 
     #endregion
-
   }
+  #endregion
+
+  #region I2cSensorDevice (baseclass)
+  // The base class for all devices
+  internal abstract class I2cSensorDevice
+  {
+    internal I2cDeviceConnection thisConnect;
+    internal I2cSensorsSupported SensorUsed;
+    internal bool Valid;
+
+    public abstract void Start();
+    public abstract void Stop();
+    public abstract void DoWork();
+
+    public I2cSensorDevice()
+    {
+    }// Constructor
+  }
+  #endregion
+
+  #region Dummy
+  internal class DummyDevice : I2cSensorDevice
+  {
+    readonly Support Sup;
+
+    public DummyDevice(Support s, string Name)
+    {
+      Sup = s;
+      Sup.LogDebugMessage($"Dummy Constructor...{Name}");
+      SensorUsed = I2cSensorsSupported.Dummy;
+      Valid = false;
+    }
+
+    public override void Start()
+    {
+    }
+
+    public override void Stop()
+    {
+    }
+
+    public override void DoWork()
+    {
+    }
+  } // End SHT31Device
+  #endregion
+
+  #region SHT31Device
+  internal class SHT31Device : I2cSensorDevice
+  {
+    readonly Support Sup;
+
+    // List of commands for SHT31
+    readonly byte[] SHT31SoftResetCommand = { 0x30, 0xA2 }; // Soft Reset.
+    readonly byte[] SHT31ReadStatusCommand = { 0xF3, 0x2D }; // Soft Reset.
+                                                             // readonly byte[] SHT31BreakCommand = { 0x30, 0x93 }; // Soft Reset.
+
+    readonly byte[] SHT31SingleShotCommand = { 0x2C, 0x0D }; // Single shot fetch; Clock stretching disabled, medium repeatability.
+
+    //--------------------------------------------------------------------------------------------------------------------------------
+
+    // General response  buffer, to enlarge of there are ICs which require that.
+    byte[] Response = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    public SHT31Device(Support s, string Name)
+    {
+      Sup = s;
+      SensorUsed = I2cSensorsSupported.SHT31;
+      Valid = true;
+      Sup.LogTraceInfoMessage($"I2cSensorDevice SHT31 Constructor...{Name}, Valid = {Valid}");
+      Sup.LogTraceInfoMessage($"Print AddressDetected for SensorUsed: {I2C.i2cAddressDetected[(int)SensorUsed]} for {SensorUsed}");
+    }
+
+    public override void Start()
+    {
+      Sup.LogDebugMessage($"I2cSensorDevice {SensorUsed} Start on address {I2C.i2cAddress[(int)SensorUsed]:x2}");
+      thisConnect = Program.thisDriver.Connect(I2C.i2cAddress[(int)SensorUsed]);
+    }
+
+    public override void Stop()
+    {
+      Sup.LogDebugMessage($"I2ccSensorDevice {SensorUsed} stop");
+
+      // Get and display the status before exiting
+      lock (Response)
+      {
+        thisConnect.Write(SHT31ReadStatusCommand);
+        Response = thisConnect.Read(3);
+        thisConnect.Write(SHT31SoftResetCommand);
+      }
+
+      Sup.LogDebugMessage($"StatusWord {SensorUsed}: {Convert.ToString((ushort)(Response[0] * 256 + Response[1]), toBase: 2)} ");
+    }
+
+    public override void DoWork()
+    {
+      I2cSensordata thisReading = new I2cSensordata();
+
+      Sup.LogTraceInfoMessage($"I2cSensorDeevice {SensorUsed}: DoWork routine entry");
+
+      try
+      {
+        lock (Response)
+        {
+          thisConnect.Write(SHT31SingleShotCommand);
+          Response = thisConnect.Read(6);
+        }
+
+        // For debugging, normally not on
+        Sup.LogTraceInfoMessage($"I2cSensorDeevice {SensorUsed} data read: {Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
+
+        thisReading.Humidity = 100 * (double)(Response[3] * 0x100 + Response[4]) / 65535;             // BitConverter.ToUInt16(Response, 3) / 65535;
+        thisReading.TemperatureF = -49 + 315 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // Must be in Fahrenheit for the Davis simulation
+        thisReading.TemperatureC = -45 + 175 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // This is the same in Celsius
+
+        I2C.ObservationList.Add(thisReading);
+      }
+      catch (Exception e)
+      {
+        Sup.LogTraceWarningMessage($"I2cSensorDeevice Exception {SensorUsed}:...{e.Message}");
+      }
+
+      return;
+    }
+  } // End SHT31Device
+  #endregion
 }

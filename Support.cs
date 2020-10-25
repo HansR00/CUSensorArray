@@ -39,13 +39,13 @@ namespace zeroWsensors
       if (!Directory.Exists("log")) Directory.CreateDirectory("log");
 
       string[] files = Directory.GetFiles("log");
-      
+
       if (files.Length >= 10)
       {
         foreach (string file in files)
         {
           FileInfo fi = new FileInfo(file);
-          if (DateTime.Now.Subtract(fi.LastWriteTime).TotalDays > 30 ) fi.Delete();
+          if (DateTime.Now.Subtract(fi.LastWriteTime).TotalDays > 30) fi.Delete();
         }
       }
 
@@ -76,10 +76,7 @@ namespace zeroWsensors
     #region VersionCopyright
     public string Version()
     {
-      string tmp;
-
-      tmp = typeof(Support).Assembly.GetName().Version.Major + "." + typeof(Support).Assembly.GetName().Version.Minor + "." + typeof(Support).Assembly.GetName().Version.Build;
-
+      string tmp = typeof(Support).Assembly.GetName().Version.Major + "." + typeof(Support).Assembly.GetName().Version.Minor + "." + typeof(Support).Assembly.GetName().Version.Build;
       return string.Format(CultureInfo.InvariantCulture, $"CUSensorArray - Version {tmp} - Started at {DateTime.Now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}");
     }
 
@@ -90,8 +87,6 @@ namespace zeroWsensors
     #region SpecificConversionByteHex
     public string ByteArrayToHexString(byte[] ba)
     {
-      // https://stackoverflow.com/questions/311165/how-do-you-convert-a-byte-array-to-a-hexadecimal-string-and-vice-versa
-
       StringBuilder hex = new StringBuilder(ba.Length * 2);
       foreach (byte b in ba)
         hex.AppendFormat("{0:x2}", b);
@@ -100,10 +95,7 @@ namespace zeroWsensors
 
     public string BoolArrayToBitString(bool[] b)
     {
-      // https://stackoverflow.com/questions/311165/how-do-you-convert-a-byte-array-to-a-hexadecimal-string-and-vice-versa
-
       StringBuilder bitBuilder = new StringBuilder(b.Length * 2);
-      bitBuilder.Append("Bitstring DHT22 : ");
 
       for (int i = 0; i < 40; i++)
       {

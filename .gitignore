@@ -351,3 +351,10 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+GlobalSuppressions.cs
+CuSensorArray.csproj
+CuSensorArray.csproj
+Properties/launchSettings.json
+Properties/launchSettings.json
+Properties/launchSettings.json
+CuSensorArray.csproj

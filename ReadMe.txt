@@ -12,28 +12,65 @@ Environment: 	Raspberry 3B+
 		(https://docs.microsoft.com/en-gb/dotnet/core/install/how-to-detect-installed-versions?pivots=os-linux) 
 License: 	GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
 Files: 		Program.cs 
+		EmulateAirLink.cs
 		i2c.cs 
+                Inifile.cs
 		OneWire.cs (nothing there) 
 		Serial.cs 
-		Support.cs 
-		WebServer.cs
+		Support.cs
+                LICENSE
+                ReadMe.txt 
 
-This is a program for the Raspberry Pi to readout serveral sensors through the GPIO pins. Currently two sensors (PMS1003 and SHT31) on the serial and the i2c interface are supported. It is meant to run under Linux Buster as a .NET Core 3.1 dll on a Raspberry Pi and it emulates a Davis AirLink device. It is meant as a hobby project, not as a direct replacement of the Davis AirLink.
+This is a program for the Raspberry Pi to readout serveral sensors through the GPIO pins. Currently two sensors (PMS1003 and SHT31) on the serial and the i2c interface are supported. It is meant to run under Linux Buster as a .NET Core 3.1 dll on a Raspberry Pi and it emulates a Davis AirLink device. It is meant as a hobby project, not as a direct replacement of the Davis AirLink although the sensors use are of similar quality.
 
-Data is written out to CUSensorArray.txt.
+Data is written out to CUSensorArray.txt for local use.
 
-A small webserver is present to mimic the Davis interface if its AirLink Air quality sensor. This is especially designed for CumulusMX, but any (and I mean any) request to this server will get as a reply the JSON structure with the current data. All averages are being served, the nowcast exponential interpolation still has to b e done and gets a -1 as value.
+A small webserver is present to mimic the Davis interface if its AirLink Air quality sensor. This is especially designed for CumulusMX, but any (and I mean any) request to this server will get as a reply the JSON structure with the current data. All averages are being served including the nowcast exponential interpolation.
 
-I bought the sensors and the breakout circuit for roughly 35 euro, some wires and breadboard you're supposed to have. Add a Raspberry Pi (from 3B+) for euro 35. Look carfully to the wiring / pins.
+I bought the sensors and the breakout circuit for roughly 35 euro, some wires and breadboard you're supposed to have. Add a Raspberry Pi (from 3B+) for euro 35 and you'll have a cheap solution with high learning capability. Look carfully to the wiring / pins.
 
 When compiled and dotnet is installed, run as follows:
 
 	nohup dotnet sudo dotnet CUSensorArray.dll
 
-NOTE: it must be run as root to prevent problems with GPIO accessibility. The RPi can be used for other purposes but don't overload it, GPIO is time critical. Close the commandline window when it's running, you can check its operation through tail -f sensors.log which shows whether it is still running or not. If CMX is running and properly configured it will poll for the AirLink and the CUSensorArray will respond as an AirLink and you will find you data in the CMX AirLink data file.
+In version 0.4.0 configurability is added through an inifile CUSensorArray.ini. Run once to generate a file with empty fields, the program exits. The inifile looks as follows:
+
+--------------------------------
+[General]
+TraceInfo=Warning		Possible Error, Warning, Info, Verbose, None
+AirLinkEmulation=true		true or false
+
+[AirLinkDevices]		Defines which sensors constitute the AirLink
+PMdevice=Serial0		
+THdevice=I2C0
+
+[SerialDevices]			Defines the serial [PM]sensors
+Serial0=PMS1003
+Serial1=
+
+[I2CDevices]			Defines the I2C sensors
+I2C0=SHT31
+I2C1=
+I2C2=
+I2C3=
+I2C4=
+I2C5=
+I2C6=
+I2C7=
+
+[PortDefinitions]
+PMS1003_SerialPort=/dev/ttyS0
+PMS1003_SerialBaudrate=9600
+PMS1003_SerialParity=None
+PMS1003_SerialDataBits=8
+PMS1003_SerialStopBits=One
+--------------------------------
+
+NOTE: it must be run as root to prevent problems with GPIO accessibility. The RPi can be used for other purposes but don't overload it, GPIO is time critical. Close the commandline window when it's running, you can check its operation through tail -f CUSensorArray.txt which shows whether it is still running or not. If CMX is running and properly configured it will poll for the AirLink and the CUSensorArray will respond as an AirLink and you will find your data in the CMX AirLink data file.
 
 NOTE: the program  is stopped by sending it the signal SIGINT.
 Other sensors can (and will)e added.
+
 [Wiring] :
 Wiring is your own of course but make sure the datalines are as below.
 [PMS1003]

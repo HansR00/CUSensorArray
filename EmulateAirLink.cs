@@ -6,28 +6,40 @@ using System.Text;
 
 namespace zeroWsensors
 {
+  #region AirLink Emulator
   public class EmulateAirLink
   {
     private readonly Support Sup;
-    private readonly Serial Ser;
+    private Serial SerialDevice;
+    private I2C I2cDevice;
 
+    public double TemperatureF, Humidity;
+    public double PM1_last, PM25_last, PM10_last;
     public List<double> PM25_last_1_hourList = new List<double>();  // The list to create the minutevalues
     public List<double> PM25_last_3_hourList = new List<double>();  // The list to create the minutevalues
     public List<double> PM25_last_24_hourList = new List<double>(); // The list to create the minutevalues
-    //public List<double> PM25_nowcast = new List<double>();          // The list to create the minutevalues
     public List<double> PM10_last_1_hourList = new List<double>();  // The list to create the minutevalues
     public List<double> PM10_last_3_hourList = new List<double>();  // The list to create the minutevalues
     public List<double> PM10_last_24_hourList = new List<double>(); // The list to create the minutevalues
-    //public List<double> PM10_nowcast = new List<double>();          // The list to create the minutevalues
     public double NowCast25, NowCast10;                             // Just need one parameter, after calculation 
                                                                     // it is send by the webserver and can be forgotten.
 
-    public EmulateAirLink(Support s, Serial se)
+    public EmulateAirLink(Support s)
     {
       Sup = s;
-      Ser = se;
+      Sup.LogDebugMessage($"AirLink Emulator: Constructor and started");
     }
-    
+
+    public void SetSerialDevice(Serial s)
+    {
+      SerialDevice = s;
+    }
+
+    public void SetI2cDevice(I2C i)
+    {
+      I2cDevice = i;
+    }
+
     public void DoAirLink()
     {
       // For Airquality (AirNow) and nowscast documentation: see Program.cs
@@ -35,28 +47,35 @@ namespace zeroWsensors
 
       Sup.LogTraceInfoMessage($"DoAirLink: Adding minutevalues to the averageslists...");
 
+      TemperatureF = I2cDevice.MinuteValues.TemperatureF;
+      Humidity = I2cDevice.MinuteValues.Humidity;
+
+      PM1_last = SerialDevice.MinuteValues.Pm1_atm;
+      PM25_last = SerialDevice.MinuteValues.Pm25_atm;
+      PM10_last = SerialDevice.MinuteValues.Pm10_atm;
+
       if (PM25_last_1_hourList.Count == 60) PM25_last_1_hourList.RemoveAt(0);
-      PM25_last_1_hourList.Add(Ser.Sensor.MinuteValues.Pm25_atm);
+      PM25_last_1_hourList.Add(SerialDevice.MinuteValues.Pm25_atm);
       Sup.LogTraceInfoMessage($"DoAirLink: PM25_last_1_hourList - count: {PM25_last_1_hourList.Count} / Average: {PM25_last_1_hourList.Average():F1}");
 
       if (PM25_last_3_hourList.Count == 3 * 60) PM25_last_3_hourList.RemoveAt(0);
-      PM25_last_3_hourList.Add(Ser.Sensor.MinuteValues.Pm25_atm);
+      PM25_last_3_hourList.Add(SerialDevice.MinuteValues.Pm25_atm);
       Sup.LogTraceInfoMessage($"DoAirLink: PM25_last_3_hourList - count: {PM25_last_3_hourList.Count} / Average {PM25_last_3_hourList.Average():F1}");
 
       if (PM25_last_24_hourList.Count == 24 * 60) PM25_last_24_hourList.RemoveAt(0);
-      PM25_last_24_hourList.Add(Ser.Sensor.MinuteValues.Pm25_atm);
+      PM25_last_24_hourList.Add(SerialDevice.MinuteValues.Pm25_atm);
       Sup.LogTraceInfoMessage($"DoAirLink: PM25_last_24_hourList - count: {PM25_last_24_hourList.Count} / Average {PM25_last_24_hourList.Average():F1}");
 
       if (PM10_last_1_hourList.Count == 60) PM10_last_1_hourList.RemoveAt(0);
-      PM10_last_1_hourList.Add(Ser.Sensor.MinuteValues.Pm10_atm);
+      PM10_last_1_hourList.Add(SerialDevice.MinuteValues.Pm10_atm);
       Sup.LogTraceInfoMessage($"DoAirLink: PM10_last_1_hourList - count: {PM10_last_1_hourList.Count} / Average {PM10_last_1_hourList.Average():F1}");
 
       if (PM10_last_3_hourList.Count == 3 * 60) PM10_last_3_hourList.RemoveAt(0);
-      PM10_last_3_hourList.Add(Ser.Sensor.MinuteValues.Pm10_atm);
+      PM10_last_3_hourList.Add(SerialDevice.MinuteValues.Pm10_atm);
       Sup.LogTraceInfoMessage($"DoAirLink: PM10_last_3_hourList - count: {PM10_last_3_hourList.Count} / Average {PM10_last_3_hourList.Average():F1}");
 
       if (PM10_last_24_hourList.Count == 24 * 60) PM10_last_24_hourList.RemoveAt(0);
-      PM10_last_24_hourList.Add(Ser.Sensor.MinuteValues.Pm10_atm);
+      PM10_last_24_hourList.Add(SerialDevice.MinuteValues.Pm10_atm);
       Sup.LogTraceInfoMessage($"DoAirLink: PM10_last_24_hourList - count: {PM10_last_24_hourList.Count} / Average {PM10_last_24_hourList.Average():F1}");
 
       NowCast25 = CalculateNowCast(PM25_last_24_hourList);
@@ -79,7 +98,7 @@ namespace zeroWsensors
       double[] HourlyAverages = new double[NrOfHoursForNowCast];   // To hold the hourly averages of PM values of the last 12 hrs
       double[] thisArray;                         // To hold thisList as an array
 
-      if (thisList.Count < 2 * NrOfMinutesInHour ) return 0.0;         // Less than 2 hrs in the list, then skip this and return no value
+      if (thisList.Count < 2 * NrOfMinutesInHour) return 0.0;         // Less than 2 hrs in the list, then skip this and return no value
 
       Sup.LogTraceVerboseMessage($"DoAirLink/CalcNowCast: List contains {thisList.Count} elements present.");
 
@@ -122,26 +141,26 @@ namespace zeroWsensors
     }
   }
 
+  #endregion
+
+  #region Webserver
+
   public delegate void delReceiveWebRequest(HttpListenerContext Context);
 
   public class WebServer
   {
     readonly Support Sup;
-    readonly I2C thisI2C;
-    readonly Serial thisSerial;
     readonly EmulateAirLink thisAirLink;
 
     protected HttpListener Listener;
-    // protected bool IsStarted = false;
 
     public event delReceiveWebRequest ReceiveWebRequest;
     public const string baseURL = "http://+/";
 
-    public WebServer(Support s, I2C i, Serial se, EmulateAirLink emu)
+    public WebServer(Support s, EmulateAirLink emu)
     {
       Sup = s;
-      thisI2C = i;
-      thisSerial = se;
+      Sup.LogDebugMessage($"Webserver: Constructor entry");
       thisAirLink = emu;
     }
 
@@ -158,6 +177,7 @@ namespace zeroWsensors
         {
           Listener.Start();
           IAsyncResult result = Listener.BeginGetContext(new AsyncCallback(WebRequestCallback), Listener);
+          Sup.LogTraceInfoMessage($"Webserver Start succesfull.");
         }
         catch (Exception e) when (e is HttpListenerException || e is ObjectDisposedException)
         {
@@ -175,17 +195,11 @@ namespace zeroWsensors
 
       if (Listener != null)
       {
-        try
-        {
-          Listener.Close();   // Might consider using Stop() to keep the object. Not now anyway
-          Listener = null;
-        }
-        catch (Exception e)
-        {
-          Sup.LogTraceWarningMessage($"Webserver: Stop Exception - {e.Message}");
-          Listener = null;    // Do this anyway.
-        }
+        try { Listener.Close(); }
+        catch (Exception e) { Sup.LogTraceWarningMessage($"Webserver: Stop Exception - {e.Message}"); }
       }
+
+      Listener = null;
 
       return;
     }
@@ -277,21 +291,21 @@ namespace zeroWsensors
       sb.AppendLine("    \"conditions\":[ {");
       sb.AppendLine("        \"lsid\":000000,");
       sb.AppendLine("        \"data_structure_type\":6,");
-      sb.AppendLine($"        \"temp\":{thisI2C.SHT31current.TemperatureF:F1},");   // Send the temp in the required Fahrenheit
-      sb.AppendLine($"        \"hum\":{thisI2C.SHT31current.Humidity:F1},");
+      sb.AppendLine($"        \"temp\":{thisAirLink.TemperatureF:F1},");   // Send the temp in the required Fahrenheit
+      sb.AppendLine($"        \"hum\":{thisAirLink.Humidity:F1},");
       sb.AppendLine("        \"dew_point\":-1,");
       sb.AppendLine("        \"wet_bulb\":-1,");
       sb.AppendLine("        \"heat_index\":-1,");
       sb.AppendLine("        \"pm_1_last\":-1,");
       sb.AppendLine("        \"pm_2p5_last\":-1,");
       sb.AppendLine("        \"pm_10_last\":-1,");
-      sb.AppendLine($"        \"pm_1\":{thisSerial.Sensor.MinuteValues.Pm1_atm:F2},");
-      sb.AppendLine($"        \"pm_2p5\":{thisSerial.Sensor.MinuteValues.Pm25_atm:F2},");
+      sb.AppendLine($"        \"pm_1\":{thisAirLink.PM1_last:F2},");
+      sb.AppendLine($"        \"pm_2p5\":{thisAirLink.PM25_last:F2},");
       sb.AppendLine($"        \"pm_2p5_last_1_hour\":{thisAirLink.PM25_last_1_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_2p5_last_3_hours\":{thisAirLink.PM25_last_3_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_2p5_last_24_hours\":{thisAirLink.PM25_last_24_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_2p5_nowcast\":{thisAirLink.NowCast25:F2},");
-      sb.AppendLine($"        \"pm_10\":{thisSerial.Sensor.MinuteValues.Pm10_atm:F2},");
+      sb.AppendLine($"        \"pm_10\":{thisAirLink.PM10_last:F2},");
       sb.AppendLine($"        \"pm_10_last_1_hour\":{thisAirLink.PM10_last_1_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_10_last_3_hours\":{thisAirLink.PM10_last_3_hourList.Average():F2},");
       sb.AppendLine($"        \"pm_10_last_24_hours\":{thisAirLink.PM10_last_24_hourList.Average():F2},");
@@ -320,4 +334,7 @@ namespace zeroWsensors
       return;
     }
   }// Class Webserver
+
+  #endregion
+
 } // Namespace

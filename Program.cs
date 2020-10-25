@@ -82,12 +82,12 @@
 //      https://cumulus.hosiene.co.uk/viewtopic.php?f=44&t=18541
 //
 
+using RaspberrySharp.IO.GeneralPurpose;
+using RaspberrySharp.IO.InterIntegratedCircuit;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Threading;
 
 namespace zeroWsensors
@@ -95,16 +95,21 @@ namespace zeroWsensors
   // Clock definitions
   public class Program
   {
-    public static TraceSwitch CUSensorsSwitch { get; set; }
-    public static bool AirLinkEmulation { get; set; }
+    const int MaxNrSerialSensors = 2;
+    const int MaxNrI2cSensors = 8;
 
-    Support Sup;
-    I2C thisI2C;
-    Serial thisSerial;
+    public static TraceSwitch CUSensorsSwitch { get; private set; }
+    public static bool AirLinkEmulation { get; private set; }
+    public static I2cDriver thisDriver { get; private set; }
+
+    bool Continue = true;
+
+    readonly I2C[] thisI2C = new I2C[MaxNrI2cSensors];              // Max 8 I2C sensors, maybe make this configurable later
+    readonly Serial[] thisSerial = new Serial[MaxNrSerialSensors];  // Max two serial sensors
     EmulateAirLink thisEmulator;
     WebServer thisWebserver;
 
-    bool Continue = true;
+    Support Sup;
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0063:Use simple 'using' statement", Justification = "<Pending>")]
     private static void Main() // string[] args
@@ -115,53 +120,7 @@ namespace zeroWsensors
 
     void RealMain()
     {
-      #region Init
-
-      // Setup logging and Ini
-      Sup = new Support();
-
-      Console.CancelKeyPress += new ConsoleCancelEventHandler(CtrlCHandler);
-      CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
-
-      Trace.Listeners.Add(new TextWriterTraceListener($"log/{DateTime.Now.ToString("yyMMddHHmm", CultureInfo.InvariantCulture)}sensors.log"));
-      Trace.AutoFlush = true;
-      CUSensorsSwitch = new TraceSwitch("CUSensorsSwitch", "Tracing switch for CUSensors")
-      {
-        Level = TraceLevel.Verbose
-      };
-
-      Sup.LogDebugMessage($"Initial {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
-
-      AirLinkEmulation = Sup.GetSensorsIniValue("General", "AirLinkEmulation", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
-      string thisTrace = Sup.GetSensorsIniValue("General", "TraceInfo", "Warning");   // Verbose, Information, Warning, Error, Off
-
-      // Now set the Trace level to the wanted value
-      switch( thisTrace.ToLower() )
-      {
-        case "error":
-          CUSensorsSwitch.Level = TraceLevel.Error;
-          break;
-
-        case "warning":
-          CUSensorsSwitch.Level = TraceLevel.Warning;
-          break;
-
-        case "info":
-          CUSensorsSwitch.Level = TraceLevel.Info;
-          break;
-
-        case "verbose":
-          CUSensorsSwitch.Level = TraceLevel.Verbose;
-          break;
-
-        default:
-          CUSensorsSwitch.Level = TraceLevel.Off;
-          break;
-      }
-
-      Sup.LogDebugMessage($"According to Inifile {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
-
-      #endregion
+      Init();
 
       Sup.LogDebugMessage(message: "ZeroWsensors : ----------------------------");
       Sup.LogDebugMessage(message: "ZeroWsensors : Entering Main");
@@ -169,28 +128,13 @@ namespace zeroWsensors
       Console.WriteLine($"{Sup.Version()} {Sup.Copyright}");
       Sup.LogDebugMessage($"{Sup.Version()} {Sup.Copyright}");
 
-      Console.WriteLine("CUSensorArray - Copyright (C) 2020  Hans Rottier\n" +
-        "This program comes with ABSOLUTELY NO WARRANTY;\n" +
+      Console.WriteLine("This program comes with ABSOLUTELY NO WARRANTY;\n" +
         "This is free software, and you are welcome to redistribute it under certain conditions.");
-      Sup.LogDebugMessage("CUSensorArray - Copyright (C) 2020  Hans Rottier\n" +
-        "This program comes with ABSOLUTELY NO WARRANTY;\n" +
+      Sup.LogDebugMessage("This program comes with ABSOLUTELY NO WARRANTY;\n" +
         "This is free software, and you are welcome to redistribute it under certain conditions.");
 
 
-      #region MainLoop
-
-      // So, here we go...
-      thisI2C = new I2C(Sup);
-      thisSerial = new Serial(Sup);
-
-      if (AirLinkEmulation)
-      {
-        // Only do the emulator and Webserver if it is asked for (default = false)!!
-        //
-        thisEmulator = new EmulateAirLink(Sup, thisSerial);
-        thisWebserver = new WebServer(Sup, thisI2C, thisSerial, thisEmulator);
-        thisWebserver.Start();
-      }
+     #region MainLoop
 
       // Start the loop
       using (StreamWriter of = new StreamWriter("CUSensorArray.txt", true))
@@ -205,10 +149,10 @@ namespace zeroWsensors
 
           if (Continue)
           {
-            thisSerial.DoSerial();
-            thisI2C.DoI2C();
-
             Clock++;
+
+            for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i]?.DoSerial();  // Takes care of the reading of the serial devices
+            for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i]?.DoWork();          // Takes care of the  reading of the I2C devices
 
             // So we came here 6 times every 10 seconds. Create the minute values and remove the existing list, create a new one
             // The average values are always real averages even if some fetches failed in which case the list is shorter 
@@ -218,17 +162,18 @@ namespace zeroWsensors
             {
               Clock = 0;
 
-              Sup.LogTraceInfoMessage($"Serial: Creating minutevalues as average of the 10 second observations...");
-              thisSerial.Sensor.MinuteValues.Pm1_atm = thisSerial.Sensor.ObservationList.Select(x => x.Pm1_atm).Average();
-              thisSerial.Sensor.MinuteValues.Pm25_atm = thisSerial.Sensor.ObservationList.Select(x => x.Pm25_atm).Average();
-              thisSerial.Sensor.MinuteValues.Pm10_atm = thisSerial.Sensor.ObservationList.Select(x => x.Pm10_atm).Average();
+              for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i]?.SetMinuteValuesFromObservations();
+              for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i]?.SetMinuteValuesFromObservations();
 
-              thisSerial.Sensor.ObservationList = new List<PMSensordata>();  // The old list disappears through the garbage collector.
+              // Write out to the logfile
+              for (int i = 0; i < MaxNrSerialSensors; i++) thisLine += $";{thisSerial[i]?.MinuteValues.Pm1_atm:F1};{thisSerial[i]?.MinuteValues.Pm25_atm:F1};{thisSerial[i]?.MinuteValues.Pm10_atm:F1}";
+              for (int i = 0; i < MaxNrI2cSensors; i++) thisLine += $";{thisI2C[i]?.MinuteValues.TemperatureC:F1};{thisI2C[i]?.MinuteValues.Humidity:F0}";
 
-              thisLine = $"{thisI2C.SHT31current.TemperatureC:F1};{thisI2C.SHT31current.Humidity:F0};" +
-                $"{thisSerial.Sensor.MinuteValues.Pm1_atm:F1};{thisSerial.Sensor.MinuteValues.Pm25_atm:F1};{thisSerial.Sensor.MinuteValues.Pm10_atm:F1};";
-              of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm};{thisLine}");
+              Sup.LogTraceInfoMessage(message: "ZeroWsensors : Writing out the data to the logfile");
+              Sup.LogTraceInfoMessage(message: $"{thisLine}");
+              of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}");
               of.Flush();
+              thisLine = "";
 
               // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
               // all other necessary lists and calculated values from there
@@ -306,10 +251,10 @@ namespace zeroWsensors
           break;
 
         case ConsoleSpecialKey.ControlC:
-          thisI2C.StopI2C();
-          thisSerial.SerialStop();
-          thisWebserver.Stop();
-          args.Cancel = true;                                     // Do not immedialtely stop the process, handle it by the Continue loop control boolean.
+          for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i].Stop();
+          for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i].Stop();
+          if (AirLinkEmulation) thisWebserver.Stop();
+          args.Cancel = true;   // Do not immedialtely stop the process, handle it by the Continue loop control boolean.
           Continue = false;
           break;
 
@@ -320,6 +265,118 @@ namespace zeroWsensors
 
       return;
     }
+
+    #endregion
+
+    #region Init
+    void Init()
+    {
+      bool NoSerialDevice = false;
+      bool NoI2cDevice = false;
+
+      // Setup logging and Ini
+      Sup = new Support();
+
+      Sup.LogDebugMessage(message: "Init() : Start");
+
+      string AirLinkPMDevice = "";
+      string AirLinkTHDevice = "";
+
+      Console.CancelKeyPress += new ConsoleCancelEventHandler(CtrlCHandler);
+      CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+
+      // Setup tracing
+      Trace.Listeners.Add(new TextWriterTraceListener($"log/{DateTime.Now.ToString("yyMMddHHmm", CultureInfo.InvariantCulture)}sensors.log"));
+      Trace.AutoFlush = true;
+      CUSensorsSwitch = new TraceSwitch("CUSensorsSwitch", "Tracing switch for CUSensors")
+      {
+        Level = TraceLevel.Verbose
+      };
+
+      Sup.LogDebugMessage($"Initial {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
+
+      string thisTrace = Sup.GetSensorsIniValue("General", "TraceInfo", "Warning");   // Verbose, Information, Warning, Error, Off
+
+      // Now set the Trace level to the wanted value
+      switch (thisTrace.ToLower())
+      {
+        case "error": CUSensorsSwitch.Level = TraceLevel.Error; break;
+        case "warning": CUSensorsSwitch.Level = TraceLevel.Warning; break;
+        case "info": CUSensorsSwitch.Level = TraceLevel.Info; break;
+        case "verbose": CUSensorsSwitch.Level = TraceLevel.Verbose; break;
+        default: CUSensorsSwitch.Level = TraceLevel.Off; break;
+      }
+
+      Sup.LogDebugMessage($"According to Inifile {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
+
+      // Determine which sensor has to be for the AirLink:
+      AirLinkEmulation = Sup.GetSensorsIniValue("General", "AirLinkEmulation", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+      AirLinkPMDevice = Sup.GetSensorsIniValue("AirLinkDevices", $"PMdevice", "");
+      AirLinkTHDevice = Sup.GetSensorsIniValue("AirLinkDevices", $"THdevice", "");
+
+      // Check if we want AirLinkEmulation and do accordingly
+      //
+      if (AirLinkEmulation)
+      {
+        Sup.LogDebugMessage(message: "Init : Creating the AirLink Emulator and the Webserver");
+        thisEmulator = new EmulateAirLink(Sup);
+        thisWebserver = new WebServer(Sup, thisEmulator);
+      }
+
+      // Do the Serial devices
+      Sup.LogDebugMessage(message: "Init : Creating the Serial devices");
+      for (int i = 0; i < MaxNrSerialSensors; i++)
+      {
+        string DeviceName = Sup.GetSensorsIniValue("SerialDevices", $"Serial{i}", "");
+        thisSerial[i] = new Serial(Sup, DeviceName);
+        if (AirLinkEmulation && $"Serial{i}" == AirLinkPMDevice)
+        {
+          Sup.LogDebugMessage(message: $"Init : Serial{i} is AirLink device");
+          thisSerial[i].IsAirLinkSensor = true;
+          thisEmulator.SetSerialDevice(thisSerial[i]);
+        }
+
+        if (i == 0 && string.IsNullOrEmpty(DeviceName))
+        {
+          NoSerialDevice = true;
+          break;
+        }
+      }// Serial devices
+
+      // Do the i2c devices
+      // Define the driver on this level so we only have one driver in the system on which we open all connections
+      Sup.LogTraceInfoMessage(message: "Init : Creating the I2C driver");
+      thisDriver = new I2cDriver(ProcessorPin.Gpio02, ProcessorPin.Gpio03, false);
+      Sup.LogTraceInfoMessage(message: $"Init : created the I2cDriver {thisDriver}");
+      I2C.DetectSensors(Sup);
+
+      for (int i = 0; i < MaxNrI2cSensors; i++)
+      {
+        string DeviceName = Sup.GetSensorsIniValue("I2CDevices", $"I2C{i}", "");
+        thisI2C[i] = new I2C(Sup, DeviceName);
+        if (AirLinkEmulation && $"I2C{i}" == AirLinkTHDevice)
+        {
+          Sup.LogDebugMessage(message: $"Init : I2C{i} is AirLink device");
+          thisI2C[i].IsAirLinkSensor = true;
+          thisEmulator.SetI2cDevice(thisI2C[i]);
+        }
+
+        if (i == 0 && string.IsNullOrEmpty(DeviceName))
+        {
+          NoI2cDevice = true;
+          break;
+        }
+      }// i2c devices
+
+      if (NoI2cDevice && NoSerialDevice) Environment.Exit(0);
+
+      if (AirLinkEmulation)
+      {
+        Sup.LogDebugMessage(message: $"Init : Starting the webserver");
+        thisWebserver.Start();
+      }
+
+    } // Init
 
     #endregion
 

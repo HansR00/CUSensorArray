@@ -18,18 +18,24 @@
  * 
  * License:     GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
  * 
+ *  // Use next for possible debugging purposes
+ *  // private readonly string[] PortNames;
+ *  // PortNames = SerialPort.GetPortNames();
+ *  // foreach (string name in PortNames) Console.WriteLine($"Possible Portnames: {name}");
+ * 
  */
 
-using Microsoft.VisualBasic;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Ports;
+using System.Linq;
 
 namespace zeroWsensors
 {
-  public enum PMSensorsSupported : int { PMS1003 }
+  public enum SerialSensorsSupported : int { PMS1003 }
 
+  #region PMSensorData
   public class PMSensordata
   {
     // We only use the atmospheric calibrated values, not the standardised
@@ -38,54 +44,75 @@ namespace zeroWsensors
     public double Pm10_atm { get; set; }
   }
 
-  // Use next for debugging purposes
-  // private readonly string[] PortNames;
-  // PortNames = SerialPort.GetPortNames();
-  // foreach (string name in PortNames) Console.WriteLine($"Possible Portnames: {name}");
+  #endregion
+
+  #region Serial (to be rewritten analog to I2C)
   public class Serial
   {
     private readonly Support Sup;
+    private readonly SerialSensorDevice Sensor;
+    private List<PMSensordata> ObservationList = new List<PMSensordata>();   // The list to create the minutevalues
 
-    internal readonly SensorDevice Sensor;
+    // The nest three variables belong actually to one sensor so they should be a sensor property (and will be at some time!)
+    internal volatile PMSensordata MinuteValues = new PMSensordata();         // We communicate the average over the minute
+    internal bool IsAirLinkSensor;
 
-    public Serial(Support s)
+    public Serial(Support s, string Name)
     {
       Sup = s;
+      Sup.LogDebugMessage($"Serial: Constructor...{Name}");
 
-      Sup.LogDebugMessage($"Serial: Constructor...");
-
-      Sensor = new SensorDevice(Sup);
-      Sensor.Open();
+      Sensor = new SerialSensorDevice(Sup, Name);
+      if (Sensor.Valid) Sensor.Open();
 
       return;
     }
 
-    public void SerialStop()
+    public void Stop()
     {
-      Sup.LogDebugMessage($"Serial: Stop...");
-
       if (Sensor.Valid) Sensor.Close();
-
-      return;
     }
 
     public void DoSerial()
     {
       if (Sensor.Valid)
       {
-        switch(Sensor.SensorUsed)
+        switch (Sensor.SensorUsed)
         { // So far only the PMS1003 is supported
-          case PMSensorsSupported.PMS1003:
-            DoPMS1003(Sensor);
+          case SerialSensorsSupported.PMS1003:
+            DoPMS1003();
             break;
           default:
             break;
         }
       }
+
+      return;
     }
 
-    private void DoPMS1003(SensorDevice dev)
+    public void SetMinuteValuesFromObservations()
     {
+      if (Sensor.Valid)
+      {
+        Sup.LogTraceInfoMessage($"SetMinuteValuesFromObservations: Creating minutevalues as average of the 10 second observations... {Sensor.SensorUsed}");
+        lock (MinuteValues)
+        {
+          MinuteValues.Pm1_atm = ObservationList.Select(x => x.Pm1_atm).Average();
+          MinuteValues.Pm25_atm = ObservationList.Select(x => x.Pm25_atm).Average();
+          MinuteValues.Pm10_atm = ObservationList.Select(x => x.Pm10_atm).Average();
+        }
+
+        // Renew the observationlist 
+        ObservationList = new List<PMSensordata>();  // The old list disappears through the garbage collector.
+      }
+
+      return;
+    }
+
+    private void DoPMS1003()
+    {
+      if (!Sensor.Valid) return;
+
       // https://www.instructables.com/id/Read-and-write-from-serial-port-with-Raspberry-Pi/
       // See also: https://www.google.com/search?client=firefox-b-d&q=name+of+serial+port+on+rpi+zero+w
 
@@ -101,14 +128,14 @@ namespace zeroWsensors
       {
         int Count;
 
-        if (dev.thisSerial.BytesToRead > 0)
+        if (Sensor.thisSerial.BytesToRead > 0)
         {
           do
           {
             lock (buffer)
             {
-              Count = dev.thisSerial.Read(buffer, 0, 32);
-              dev.thisSerial.DiscardInBuffer();
+              Count = Sensor.thisSerial.Read(buffer, 0, 32);
+              Sensor.thisSerial.DiscardInBuffer();
             }
 
             // Below is for debugging, takes performance
@@ -123,7 +150,7 @@ namespace zeroWsensors
           thisReading.Pm25_atm = buffer[12] * 255 + buffer[13];
           thisReading.Pm10_atm = buffer[14] * 255 + buffer[15];
 
-          dev.ObservationList.Add(thisReading);
+          ObservationList.Add(thisReading);
         }
       }
       catch (Exception e) when (e is ArgumentOutOfRangeException || e is ArgumentException || e is TimeoutException || e is InvalidOperationException || e is ArgumentNullException || e is IOException)
@@ -134,105 +161,104 @@ namespace zeroWsensors
 
       return;
     } // DoPMS1003
+
+    internal class SerialSensorDevice
+    {
+      readonly Support Sup;
+      readonly DefinitionSerialPort Port;
+
+      public SerialSensorsSupported SensorUsed;       // The enum version of the Name!
+      public SerialPort thisSerial;               // The actual port definition: devicename, baud, stopbits etc...
+      public bool Valid;                          // Is the device defined by the user actually connected??
+
+      internal SerialSensorDevice(Support s, string Name)
+      {
+        Sup = s;
+
+        Sup.LogDebugMessage($"Serial SensorDevice Constructor...{Name}");
+
+        try
+        {
+          SensorUsed = (SerialSensorsSupported)Enum.Parse(typeof(SerialSensorsSupported), Name, true);
+          Port = new DefinitionSerialPort(Sup, Name);
+          Valid = true;
+        }
+        catch (Exception e) when (e is ArgumentException || e is ArgumentNullException)
+        {
+          // We arrive here if the sensor does not exist in the Enum definition
+          Sup.LogTraceErrorMessage($"Serial: Exception on Serial Port definitions in Inifile : {e.Message}");
+          Sup.LogTraceErrorMessage("No use continuing when the particle sensor is not there - trying anyway");
+          Valid = false;
+        }
+      } // Constructor
+
+      public void Open()
+      {
+        thisSerial = new SerialPort(Port.SerialPortUsed, Port.SerialBaudRate, Port.SerialParity, Port.SerialDataBits, Port.SerialNrOfStopBits)
+        {
+          ReadTimeout = 500
+        };
+
+        try
+        {
+          thisSerial.Open();
+          Sup.LogDebugMessage($"Serial: Opened the port {Port.SerialPortUsed}, {Port.SerialBaudRate}, {Port.SerialParity}, {Port.SerialDataBits}, {Port.SerialNrOfStopBits}");
+        }
+        catch (Exception e) when (e is ArgumentOutOfRangeException || e is ArgumentException || e is IOException || e is InvalidOperationException)
+        {
+          Sup.LogTraceErrorMessage($"Serial: Exception on Open {SensorUsed}: {e.Message}");
+          Sup.LogTraceErrorMessage("No use continuing when the particle sensor is not there");
+          Valid = false;
+        }
+      }// End Open
+
+      public void Close()
+      {
+        try
+        {
+          thisSerial.Close();
+          Sup.LogDebugMessage($"Serial: Closed the port on {SensorUsed}");
+        }
+        catch (IOException e)
+        {
+          Sup.LogTraceErrorMessage($"Serial: Exception on Close {SensorUsed}: {e.Message}");
+        }
+
+        Valid = false;
+      } // End Close
+    } // End SensorDevice
+
+    internal class DefinitionSerialPort
+    {
+      readonly Support Sup;
+
+      internal string SerialPortUsed { get; set; }
+      internal int SerialBaudRate { get; set; }
+      internal Parity SerialParity { get; set; }
+      internal int SerialDataBits { get; set; }
+      internal StopBits SerialNrOfStopBits { get; set; }
+
+      internal DefinitionSerialPort(Support s, string Name)
+      {
+        Sup = s;
+
+        Sup.LogDebugMessage($"DefinitionSerialPort Constructor...");
+
+        try
+        {
+          SerialPortUsed = Sup.GetSensorsIniValue("PortDefinitions", $"{Name}_SerialPort", "/dev/ttyS0");
+          SerialBaudRate = Convert.ToInt32(Sup.GetSensorsIniValue("PortDefinitions", $"{Name}_SerialBaudrate", "9600"));
+          SerialParity = (Parity)Enum.Parse(typeof(Parity), Sup.GetSensorsIniValue("PortDefinitions", $"{Name}_SerialParity", "None"), true);
+          SerialDataBits = Convert.ToInt32(Sup.GetSensorsIniValue("PortDefinitions", $"{Name}_SerialDataBits", "8"));
+          SerialNrOfStopBits = (StopBits)Enum.Parse(typeof(StopBits), Sup.GetSensorsIniValue("PortDefinitions", $"{Name}_SerialStopBits", "One"), true);
+        }
+        catch (Exception e) when (e is ArgumentException || e is ArgumentNullException || e is OverflowException || e is FormatException)
+        {
+          Sup.LogTraceErrorMessage($"Serial: Exception on Serial Port definitions in Inifile : {e.Message}");
+        }
+      }
+    } // class DefinitionSerialPort
   } // Class Serial
 
-  internal class SensorDevice
-  {
-    readonly Support Sup;
-    readonly DefinitionSerialPort Port;
-
-    public PMSensorsSupported SensorUsed;
-    public SerialPort thisSerial;
-    public bool Valid;
-
-    // The nest three variables belong actually to one sensor so they should be a sensor property (and will be at some time!)
-    public volatile PMSensordata MinuteValues = new PMSensordata();         // We communicate the average over the minute
-    public List<PMSensordata> ObservationList = new List<PMSensordata>();   // The list to create the minutevalues
-
-    internal SensorDevice(Support s)
-    {
-      Sup = s;
-
-      Sup.LogDebugMessage($"SensorDevice Constructor...");
-
-      try
-      {
-        SensorUsed = (PMSensorsSupported)Enum.Parse(typeof(PMSensorsSupported), Sup.GetSensorsIniValue("Serial", $"SerialSensor", "PMS1003"), true);
-        Port = new DefinitionSerialPort(Sup);
-        Valid = true;
-      }
-      catch (Exception e) when (e is ArgumentException || e is ArgumentNullException)
-      {
-        // We arrive here if the sensor does not exist in the Enum definition
-        Sup.LogTraceErrorMessage($"Serial: Exception on Serial Port definitions in Inifile : {e.Message}");
-        Sup.LogTraceErrorMessage("No use continuing when the particle sensor is not there - trying anyway");
-        Valid = false;
-      }
-    } // Constructor
-
-    public void Open()
-    {
-      thisSerial = new SerialPort(Port.SerialPortUsed, Port.SerialBaudRate, Port.SerialParity, Port.SerialDataBits, Port.SerialNrOfStopBits)
-      {
-        ReadTimeout = 500
-      };
-
-      try
-      {
-        thisSerial.Open();
-        Sup.LogDebugMessage($"Serial: Opened the port {Port.SerialPortUsed}, {Port.SerialBaudRate}, {Port.SerialParity}, {Port.SerialDataBits}, {Port.SerialNrOfStopBits}");
-      }
-      catch (Exception e) when (e is ArgumentOutOfRangeException || e is ArgumentException || e is IOException || e is InvalidOperationException)
-      {
-        Sup.LogTraceErrorMessage($"Serial: Exception on Open {SensorUsed}: {e.Message}");
-        Sup.LogTraceErrorMessage("No use continuing when the particle sensor is not there");
-        Valid = false;
-      }
-    }// End Open
-
-    public void Close()
-    {
-      try
-      {
-        thisSerial.Close();
-        Sup.LogDebugMessage($"Serial: Closed the port");
-      }
-      catch (IOException e)
-      {
-        Sup.LogTraceErrorMessage($"Serial: Exception on Close {SensorUsed}: {e.Message}");
-        Valid = false;
-      }
-    } // End Close
-  } // End SensorDevice
-
-  internal class DefinitionSerialPort
-  {
-    readonly Support Sup;
-
-    public string SerialPortUsed { get; set; }
-    public int SerialBaudRate { get; set; }
-    public Parity SerialParity { get; set; }
-    public int SerialDataBits { get; set; }
-    public StopBits SerialNrOfStopBits { get; set; }
-
-    internal DefinitionSerialPort(Support s)
-    {
-      Sup = s;
-
-      Sup.LogDebugMessage($"DefinitionSerialPort Constructor...");
-
-      try
-      {
-        SerialPortUsed = Sup.GetSensorsIniValue("Serial", $"SerialPort", "/dev/ttyS0");
-        SerialBaudRate = Convert.ToInt32(Sup.GetSensorsIniValue("Serial", $"SerialBaudrate", "9600"));
-        SerialParity = (Parity)Enum.Parse(typeof(Parity), Sup.GetSensorsIniValue("Serial", $"SerialParity", "None"), true);
-        SerialDataBits = Convert.ToInt32(Sup.GetSensorsIniValue("Serial", $"SerialDataBits", "8"));
-        SerialNrOfStopBits = (StopBits)Enum.Parse(typeof(StopBits), Sup.GetSensorsIniValue("Serial", $"SerialStopBits", "One"), true);
-      }
-      catch (Exception e) when (e is ArgumentException || e is ArgumentNullException || e is OverflowException || e is FormatException)
-      {
-        Sup.LogTraceErrorMessage($"Serial: Exception on Serial Port definitions in Inifile : {e.Message}");
-      }
-    }
-  } // class DefinitionSerialPort
+  #endregion
 } // Namespace
