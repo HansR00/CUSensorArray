@@ -140,10 +140,11 @@ namespace zeroWsensors
       using (StreamWriter of = new StreamWriter("CUSensorArray.txt", true))
       {
         int Clock = 0;
-        string thisLine = "";
 
         do
         {
+          string thisLine = "";
+
           // Do this condional because the ctrl-c interrupt can be given aanywhere.
           Sup.LogTraceInfoMessage(message: "ZeroWsensors : Getting sensor values from the Main 10 second loop");
 
@@ -151,7 +152,7 @@ namespace zeroWsensors
           {
             Clock++;
 
-            for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i]?.DoSerial();  // Takes care of the reading of the serial devices
+            for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i]?.DoWork();  // Takes care of the reading of the serial devices
             for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i]?.DoWork();          // Takes care of the  reading of the I2C devices
 
             // So we came here 6 times every 10 seconds. Create the minute values and remove the existing list, create a new one
@@ -173,7 +174,6 @@ namespace zeroWsensors
               Sup.LogTraceInfoMessage(message: $"{thisLine}");
               of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}");
               of.Flush();
-              thisLine = "";
 
               // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
               // all other necessary lists and calculated values from there
@@ -368,14 +368,17 @@ namespace zeroWsensors
         }
       }// i2c devices
 
-      if (NoI2cDevice && NoSerialDevice) Environment.Exit(0);
+      if (AirLinkEmulation && (NoI2cDevice || NoSerialDevice))
+      {
+        Sup.LogDebugMessage("Init: At leat one serial and one I2c device is required for PM and T/H in AirLink emulation");
+        Environment.Exit(0);
+      }
 
       if (AirLinkEmulation)
       {
         Sup.LogDebugMessage(message: $"Init : Starting the webserver");
         thisWebserver.Start();
       }
-
     } // Init
 
     #endregion

@@ -77,7 +77,7 @@ namespace zeroWsensors
             break;
           default:
             Sup.LogDebugMessage($"I2C Constructor: I2c sensor not implemented {SensorUsed}");
-            Sensor = new DummyDevice(Sup, Name);
+            Sensor = new I2cDummyDevice(Sup, Name);
             break;
         }
         Sensor.Start();
@@ -88,7 +88,7 @@ namespace zeroWsensors
         Sup.LogTraceErrorMessage($"I2C Constructor: Exception on parsing I2cDevice Name : {e.Message}");
         Sup.LogTraceErrorMessage("Either an error in naming or driver not implemented.");
         Sup.LogTraceErrorMessage("Replacing this device by a Dummy Driver. Continuing...");
-        Sensor = new DummyDevice(Sup, Name);
+        Sensor = new I2cDummyDevice(Sup, Name);
       }
     }// Constructor
 
@@ -209,11 +209,11 @@ namespace zeroWsensors
   #endregion
 
   #region Dummy
-  internal class DummyDevice : I2cSensorDevice
+  internal class I2cDummyDevice : I2cSensorDevice
   {
     readonly Support Sup;
 
-    public DummyDevice(Support s, string Name)
+    public I2cDummyDevice(Support s, string Name)
     {
       Sup = s;
       Sup.LogDebugMessage($"Dummy Constructor...{Name}");
@@ -232,7 +232,7 @@ namespace zeroWsensors
     public override void DoWork()
     {
     }
-  } // End SHT31Device
+  } // End DummyDevice
   #endregion
 
   #region SHT31Device
@@ -269,7 +269,7 @@ namespace zeroWsensors
 
     public override void Stop()
     {
-      Sup.LogDebugMessage($"I2ccSensorDevice {SensorUsed} stop");
+      Sup.LogDebugMessage($"I2cSensorDevice {SensorUsed} stop");
 
       // Get and display the status before exiting
       lock (Response)
@@ -286,7 +286,7 @@ namespace zeroWsensors
     {
       I2cSensordata thisReading = new I2cSensordata();
 
-      Sup.LogTraceInfoMessage($"I2cSensorDeevice {SensorUsed}: DoWork routine entry");
+      Sup.LogTraceInfoMessage($"I2cSensorDevice {SensorUsed}: DoWork routine entry");
 
       try
       {
@@ -297,7 +297,7 @@ namespace zeroWsensors
         }
 
         // For debugging, normally not on
-        Sup.LogTraceInfoMessage($"I2cSensorDeevice {SensorUsed} data read: {Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
+        Sup.LogTraceInfoMessage($"I2cSensorDevice {SensorUsed} data read: {Response[0]}; {Response[1]}; {Response[2]}; {Response[3]}; {Response[4]}; {Response[5]}; "); // {Response[6]}; {Response[7]};
 
         thisReading.Humidity = 100 * (double)(Response[3] * 0x100 + Response[4]) / 65535;             // BitConverter.ToUInt16(Response, 3) / 65535;
         thisReading.TemperatureF = -49 + 315 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // Must be in Fahrenheit for the Davis simulation
@@ -307,7 +307,7 @@ namespace zeroWsensors
       }
       catch (Exception e)
       {
-        Sup.LogTraceWarningMessage($"I2cSensorDeevice Exception {SensorUsed}:...{e.Message}");
+        Sup.LogTraceWarningMessage($"I2cSensorDevice Exception {SensorUsed}:...{e.Message}");
       }
 
       return;

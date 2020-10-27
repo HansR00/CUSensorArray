@@ -5,13 +5,19 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <StartupObject>zeroWsensors.Program</StartupObject>
     <Authors>Hans Rottier</Authors>
-    <Version>0.4.0</Version>
-    <AssemblyVersion>0.4.0.0</AssemblyVersion>
+    <Version>0.8.0</Version>
+    <AssemblyVersion>0.8.0.0</AssemblyVersion>
     <PackageId>CUSensorArray</PackageId>
     <Product>CUSensorArray</Product>
     <Copyright>Hans Rottier</Copyright>
     <LangVersion>8.0</LangVersion>
-    <FileVersion>0.4.0.0</FileVersion>
+    <FileVersion>0.8.0.0</FileVersion>
+    <PackageLicenseFile></PackageLicenseFile>
+    <RepositoryUrl>https://github.com/HansR00/CUSensorArray</RepositoryUrl>
+    <RepositoryType>Github</RepositoryType>
+    <NeutralLanguage>en-GB</NeutralLanguage>
+    <Description>A Raspberry Pi GPIO sensor array handler
+(Including a Davis AirLink Emulator for CumulusMX)</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
