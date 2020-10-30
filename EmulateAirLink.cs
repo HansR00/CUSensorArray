@@ -86,6 +86,10 @@ namespace zeroWsensors
 
     private double CalculateNowCast(List<double> thisList)
     {
+      //
+      //      https://en.wikipedia.org/wiki/NowCast_(air_quality_index)
+      //
+
       const int NrOfHoursForNowCast = 12;         // Standard 12
       const int NrOfMinutesInHour = 60;           // 
 
@@ -224,48 +228,8 @@ namespace zeroWsensors
     protected virtual void ProcessRequest(HttpListenerContext Context)
     {
       /*
-       * So what needs to be returnd is the JSON structure as defined by Davis: https://weatherlink.github.io/airlink-local-api/
-       * 
-       * {
-       * "data":{
-       *   "did":"001D0A100021",
-       *   "name":"My AirLink",
-       *   "ts":1599150192,
-       *   "conditions":[
-       *     {
-       *       "lsid":123456,
-       *       "data_structure_type":6,
-       *       "temp":75.8,
-       *       "hum":54.3,
-       *       "dew_point":58.2,
-       *       "wet_bulb":62.7,
-       *       "heat_index":76.0,
-       *       "pm_1_last":1,
-       *       "pm_2p5_last":1,
-       *       "pm_10_last":1,
-       *       "pm_1":0.96,
-       *       "pm_2p5":1.21,
-       *       "pm_2p5_last_1_hour":2.30,
-       *       "pm_2p5_last_3_hours":2.29,
-       *       "pm_2p5_last_24_hours":4.81,
-       *       "pm_2p5_nowcast":2.30,
-       *       "pm_10":1.21,
-       *       "pm_10_last_1_hour":2.84,
-       *       "pm_10_last_3_hours":2.80,
-       *       "pm_10_last_24_hours":6.03,
-       *       "pm_10_nowcast":2.84,
-       *       "last_report_time":1599150192,
-       *       "pct_pm_data_last_1_hour":100,
-       *       "pct_pm_data_last_3_hours":100,
-       *       "pct_pm_data_nowcast":100,
-       *       "pct_pm_data_last_24_hours":80
-       *     }
-       *   ]
-       *  },
-       *  "error":null
-       * }
-       * 
-       */
+       * Return the JSON structure as defined by Davis: https://weatherlink.github.io/airlink-local-api/
+       */ 
 
       Sup.LogTraceInfoMessage("Webserver: ProcessRequest");
 
@@ -314,7 +278,7 @@ namespace zeroWsensors
       sb.AppendLine($"        \"pct_pm_data_last_1_hour\":{thisAirLink.PM25_last_1_hourList.Count / 60.0 * 100:F0},");
       sb.AppendLine($"        \"pct_pm_data_last_3_hours\":{thisAirLink.PM25_last_3_hourList.Count / (3 * 60.0) * 100:F0},");
       sb.AppendLine($"        \"pct_pm_data_last_24_hours\":{thisAirLink.PM25_last_24_hourList.Count / (24 * 60.0) * 100:F0},");
-      sb.AppendLine($"        \"pct_pm_data_nowcast\":{(thisAirLink.PM25_last_24_hourList.Count > 12 * 60 ? 12 * 60 : thisAirLink.PM25_last_24_hourList.Count) / (12 * 60.0) * 100:F0},");
+      sb.AppendLine($"        \"pct_pm_data_nowcast\":{(thisAirLink.PM25_last_24_hourList.Count > 12 * 60 ? 12 * 60 : thisAirLink.PM25_last_24_hourList.Count) / (12 * 60.0) * 100:F0}");
       sb.AppendLine("      } ]");  // End Of Conditions
       sb.AppendLine("    },"); // End of Data
       sb.AppendLine("    \"error\":null");

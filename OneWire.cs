@@ -22,10 +22,6 @@
 
 namespace zeroWsensors
 {
-  // DHT22 : http://www.uugear.com/portfolio/read-dht1122-temperature-humidity-sensor-from-raspberry-pi/
-  // DHT22 : specs / timings
-  //
-
   class OneWire
   {
     readonly Support Sup;

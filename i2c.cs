@@ -27,10 +27,6 @@ using System.Linq;
 
 namespace zeroWsensors
 {
-  // Reference: 1) https://blog.mrgibbs.io/using-i2c-on-the-raspberry-pi-with-c/
-  //            2) https://jeremylindsayni.wordpress.com/2017/05/08/using-net-core-2-to-read-from-an-i2c-device-connected-to-a-raspberry-pi-3-with-ubuntu-16-04/
-
-  // So far only the SHT31 is supported
   public enum I2cSensorsSupported : int { Dummy, SHT31 }
 
   #region I2cSensorData
@@ -264,7 +260,7 @@ namespace zeroWsensors
     public override void Start()
     {
       Sup.LogDebugMessage($"I2cSensorDevice {SensorUsed} Start on address {I2C.i2cAddress[(int)SensorUsed]:x2}");
-      thisConnect = Program.thisDriver.Connect(I2C.i2cAddress[(int)SensorUsed]);
+      thisConnect = Program.ThisDriver.Connect(I2C.i2cAddress[(int)SensorUsed]);
     }
 
     public override void Stop()

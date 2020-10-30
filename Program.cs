@@ -42,6 +42,14 @@
 // General : https://www.raspberrypi.org/forums/viewtopic.php?t=9729
 // General : http://www.pieter-jan.com/node/15
 //
+// Serial Ports:
+//    https://www.instructables.com/id/Read-and-write-from-serial-port-with-Raspberry-Pi/
+//    See also: https://www.google.com/search?client=firefox-b-d&q=name+of+serial+port+on+rpi+zero+w
+//
+// I2C:
+// Reference: 1) https://blog.mrgibbs.io/using-i2c-on-the-raspberry-pi-with-c/
+//            2) https://jeremylindsayni.wordpress.com/2017/05/08/using-net-core-2-to-read-from-an-i2c-device-connected-to-a-raspberry-pi-3-with-ubuntu-16-04/
+//
 // Githubs:
 //   https://github.com/gusmanb/BCM2835Managed  (Native C# code of the library)
 //   https://github.com/frankhommers/LibBcm2835.Net  (wrapper)
@@ -49,6 +57,7 @@
 //   https://stackoverflow.com/questions/23639895/include-bcm2853-lib-on-raspberry-pi (SPI on the RPi)
 //   
 // Specifics :
+// DHT22 : http://www.uugear.com/portfolio/read-dht1122-temperature-humidity-sensor-from-raspberry-pi/
 // DHT22 : https://www.hackster.io/porrey/go-native-c-with-the-dht22-a8e8eb
 // DHT11/21/22: https://broersa.github.io/dotnetcore/2017/12/29/raspberry-pi-thermometer-using-raspbian-dotnetcore-and-dht22-sensor.html
 // DHT11 : https://stackoverflow.com/questions/36915677/working-with-raspberry-pi-3-windows-10-iot-core-dht22
@@ -100,7 +109,7 @@ namespace zeroWsensors
 
     public static TraceSwitch CUSensorsSwitch { get; private set; }
     public static bool AirLinkEmulation { get; private set; }
-    public static I2cDriver thisDriver { get; private set; }
+    public static I2cDriver ThisDriver { get; private set; }
 
     bool Continue = true;
 
@@ -346,8 +355,8 @@ namespace zeroWsensors
       // Do the i2c devices
       // Define the driver on this level so we only have one driver in the system on which we open all connections
       Sup.LogTraceInfoMessage(message: "Init : Creating the I2C driver");
-      thisDriver = new I2cDriver(ProcessorPin.Gpio02, ProcessorPin.Gpio03, false);
-      Sup.LogTraceInfoMessage(message: $"Init : created the I2cDriver {thisDriver}");
+      ThisDriver = new I2cDriver(ProcessorPin.Gpio02, ProcessorPin.Gpio03, false);
+      Sup.LogTraceInfoMessage(message: $"Init : created the I2cDriver {ThisDriver}");
       I2C.DetectSensors(Sup);
 
       for (int i = 0; i < MaxNrI2cSensors; i++)

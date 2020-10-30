@@ -218,9 +218,6 @@ namespace zeroWsensors
   #region PMS1003
   internal class PMS1003Device : SerialSensorDevice
   {
-    // https://www.instructables.com/id/Read-and-write-from-serial-port-with-Raspberry-Pi/
-    // See also: https://www.google.com/search?client=firefox-b-d&q=name+of+serial+port+on+rpi+zero+w
-
     public PMS1003Device(Support s, string Name)
     {
       Sup = s;

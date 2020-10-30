@@ -32,10 +32,10 @@ namespace zeroWsensors
   {
     private readonly IniFile CUSensorIni;
 
-    #region Init
+    #region Constructor / Logging and ini setup
     public Support()
     {
-      // Do the logging setup
+      // Do the logging setup, no strict nr of keeps, just prevent the nr to get too big
       if (!Directory.Exists("log")) Directory.CreateDirectory("log");
 
       string[] files = Directory.GetFiles("log");
