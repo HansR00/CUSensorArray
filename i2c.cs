@@ -49,7 +49,7 @@ namespace zeroWsensors
 
     internal bool IsAirLinkSensor;
     internal volatile I2cSensordata MinuteValues = new I2cSensordata();               // We communicate the average over the minute
-    static public List<I2cSensordata> ObservationList = new List<I2cSensordata>();    // The list to create the minutevalues
+    public List<I2cSensordata> ObservationList = new List<I2cSensordata>();    // The list to create the minutevalues. Filled in DoWork(), Cleared in SetMinuteValuesFromObservations()
 
 
     public I2C(Support s, string Name)
@@ -100,7 +100,7 @@ namespace zeroWsensors
 
     public void DoWork()
     {
-      Sensor.DoWork();
+      Sensor.DoWork(this);
     }
 
     public void SetMinuteValuesFromObservations()
@@ -108,12 +108,22 @@ namespace zeroWsensors
       if (Sensor.Valid)
       {
         Sup.LogTraceInfoMessage($"SetMinuteValuesFromObservations: Creating minutevalues as average of the 10 second observations... {SensorUsed}");
+
+        if (Program.CUSensorsSwitch.TraceInfo)
+        {
+          int i = 0;
+          foreach (I2cSensordata entry in ObservationList) Sup.LogTraceInfoMessage($"Observationlist data {i++}: {entry.Humidity:F0}; {entry.TemperatureC:F1}; {entry.TemperatureF:F1}");
+        }
+
         MinuteValues.Humidity = ObservationList.Select(x => x.Humidity).Average();
         MinuteValues.TemperatureC = ObservationList.Select(x => x.TemperatureC).Average();
         MinuteValues.TemperatureF = ObservationList.Select(x => x.TemperatureF).Average();
 
+        Sup.LogTraceInfoMessage($"Minutevalues data: {MinuteValues.Humidity:F0}; {MinuteValues.TemperatureC:F1}; {MinuteValues.TemperatureF:F1};");
+
         // Renew the observationlist 
-        ObservationList = new List<I2cSensordata>();  // The old list disappears through the garbage collector.
+        ObservationList.Clear();
+        //ObservationList = new List<I2cSensordata>();  // The old list disappears through the garbage collector.
       }
 
       return;
@@ -196,7 +206,7 @@ namespace zeroWsensors
 
     public abstract void Start();
     public abstract void Stop();
-    public abstract void DoWork();
+    public abstract void DoWork(I2C thisSensor);
 
     public I2cSensorDevice()
     {
@@ -225,7 +235,7 @@ namespace zeroWsensors
     {
     }
 
-    public override void DoWork()
+    public override void DoWork(I2C thisSensor)
     {
     }
   } // End DummyDevice
@@ -278,7 +288,7 @@ namespace zeroWsensors
       Sup.LogDebugMessage($"StatusWord {SensorUsed}: {Convert.ToString((ushort)(Response[0] * 256 + Response[1]), toBase: 2)} ");
     }
 
-    public override void DoWork()
+    public override void DoWork(I2C thisSensor)
     {
       I2cSensordata thisReading = new I2cSensordata();
 
@@ -299,7 +309,7 @@ namespace zeroWsensors
         thisReading.TemperatureF = -49 + 315 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // Must be in Fahrenheit for the Davis simulation
         thisReading.TemperatureC = -45 + 175 * (double)(Response[0] * 0x100 + Response[1]) / 65535;   // This is the same in Celsius
 
-        I2C.ObservationList.Add(thisReading);
+        thisSensor.ObservationList.Add(thisReading);
       }
       catch (Exception e)
       {

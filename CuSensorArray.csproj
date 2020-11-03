@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DefineConstants>TRACE;DEBUG</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;PARANOIA</DefineConstants>
     <Prefer32Bit>true</Prefer32Bit>
     <Optimize>false</Optimize>
     <DebugType>portable</DebugType>

@@ -161,8 +161,8 @@ namespace zeroWsensors
           {
             Clock++;
 
-            for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i]?.DoWork();  // Takes care of the reading of the serial devices
-            for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i]?.DoWork();          // Takes care of the  reading of the I2C devices
+            for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i].DoWork();    // Takes care of the reading of the serial devices
+            for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i].DoWork();          // Takes care of the  reading of the I2C devices
 
             // So we came here 6 times every 10 seconds. Create the minute values and remove the existing list, create a new one
             // The average values are always real averages even if some fetches failed in which case the list is shorter 
@@ -172,26 +172,25 @@ namespace zeroWsensors
             {
               Clock = 0;
 
-              for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i]?.SetMinuteValuesFromObservations();
-              for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i]?.SetMinuteValuesFromObservations();
+              for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i].SetMinuteValuesFromObservations();
+              for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i].SetMinuteValuesFromObservations();
+              if (AirLinkEmulation) thisEmulator.DoAirLink();
 
               // Write out to the logfile
-              for (int i = 0; i < MaxNrSerialSensors; i++) thisLine += $";{thisSerial[i]?.MinuteValues.Pm1_atm:F1};{thisSerial[i]?.MinuteValues.Pm25_atm:F1};{thisSerial[i]?.MinuteValues.Pm10_atm:F1}";
-              for (int i = 0; i < MaxNrI2cSensors; i++) thisLine += $";{thisI2C[i]?.MinuteValues.TemperatureC:F1};{thisI2C[i]?.MinuteValues.Humidity:F0}";
+              for (int i = 0; i < MaxNrSerialSensors; i++) thisLine += $";{thisSerial[i].MinuteValues.Pm1_atm:F1};{thisSerial[i].MinuteValues.Pm25_atm:F1};{thisSerial[i].MinuteValues.Pm10_atm:F1}";
+              for (int i = 0; i < MaxNrI2cSensors; i++) thisLine += $";{thisI2C[i].MinuteValues.TemperatureC:F1};{thisI2C[i].MinuteValues.Humidity:F0}";
 
               Sup.LogTraceInfoMessage(message: "ZeroWsensors : Writing out the data to the logfile");
-              Sup.LogTraceInfoMessage(message: $"{thisLine}");
+              Sup.LogTraceInfoMessage(message: $"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}");
               of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}");
               of.Flush();
 
               // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
               // all other necessary lists and calculated values from there
-
-              if (AirLinkEmulation) thisEmulator.DoAirLink();
             }
           }
 
-          // This is really hardcoded and should NOT change. The whole thing sis based on 6 measurements per minute, so loop every 10 seconds
+          // This is really hardcoded and should NOT change. The whole thing is based on 6 measurements per minute, so loop every 10 seconds
           Thread.Sleep(10000);
         } while (Continue); // Do-While
       } // Using the datafile

@@ -55,28 +55,40 @@ namespace zeroWsensors
       PM10_last = SerialDevice.MinuteValues.Pm10_atm;
 
       if (PM25_last_1_hourList.Count == 60) PM25_last_1_hourList.RemoveAt(0);
-      PM25_last_1_hourList.Add(SerialDevice.MinuteValues.Pm25_atm);
+      PM25_last_1_hourList.Add(PM25_last);
       Sup.LogTraceInfoMessage($"DoAirLink: PM25_last_1_hourList - count: {PM25_last_1_hourList.Count} / Average: {PM25_last_1_hourList.Average():F1}");
 
       if (PM25_last_3_hourList.Count == 3 * 60) PM25_last_3_hourList.RemoveAt(0);
-      PM25_last_3_hourList.Add(SerialDevice.MinuteValues.Pm25_atm);
+      PM25_last_3_hourList.Add(PM25_last);
       Sup.LogTraceInfoMessage($"DoAirLink: PM25_last_3_hourList - count: {PM25_last_3_hourList.Count} / Average {PM25_last_3_hourList.Average():F1}");
 
       if (PM25_last_24_hourList.Count == 24 * 60) PM25_last_24_hourList.RemoveAt(0);
-      PM25_last_24_hourList.Add(SerialDevice.MinuteValues.Pm25_atm);
+      PM25_last_24_hourList.Add(PM25_last);
       Sup.LogTraceInfoMessage($"DoAirLink: PM25_last_24_hourList - count: {PM25_last_24_hourList.Count} / Average {PM25_last_24_hourList.Average():F1}");
 
       if (PM10_last_1_hourList.Count == 60) PM10_last_1_hourList.RemoveAt(0);
-      PM10_last_1_hourList.Add(SerialDevice.MinuteValues.Pm10_atm);
+      PM10_last_1_hourList.Add(PM10_last);
       Sup.LogTraceInfoMessage($"DoAirLink: PM10_last_1_hourList - count: {PM10_last_1_hourList.Count} / Average {PM10_last_1_hourList.Average():F1}");
 
       if (PM10_last_3_hourList.Count == 3 * 60) PM10_last_3_hourList.RemoveAt(0);
-      PM10_last_3_hourList.Add(SerialDevice.MinuteValues.Pm10_atm);
+      PM10_last_3_hourList.Add(PM10_last);
       Sup.LogTraceInfoMessage($"DoAirLink: PM10_last_3_hourList - count: {PM10_last_3_hourList.Count} / Average {PM10_last_3_hourList.Average():F1}");
 
       if (PM10_last_24_hourList.Count == 24 * 60) PM10_last_24_hourList.RemoveAt(0);
-      PM10_last_24_hourList.Add(SerialDevice.MinuteValues.Pm10_atm);
+      PM10_last_24_hourList.Add(PM10_last);
       Sup.LogTraceInfoMessage($"DoAirLink: PM10_last_24_hourList - count: {PM10_last_24_hourList.Count} / Average {PM10_last_24_hourList.Average():F1}");
+
+#if PARANOIA
+      // Do a paranoia check on the queue lengths: this should not be excuted in a release version
+      // Print message to logfile if such thing occurs. Note that above the checks are on equal of the count value. 
+      // As soon as the value goes above, it is an uncorrectable issue.
+      if (PM25_last_1_hourList.Count > 60) Sup.LogTraceErrorMessage($"DoAirLink: PM25_last_1_hourList - count: {PM25_last_1_hourList.Count} / Average: {PM25_last_1_hourList.Average():F1}");
+      if (PM25_last_3_hourList.Count > 3 * 60) Sup.LogTraceErrorMessage($"DoAirLink: PM25_last_3_hourList - count: {PM25_last_3_hourList.Count} / Average: {PM25_last_3_hourList.Average():F1}");
+      if (PM25_last_24_hourList.Count > 24 * 60) Sup.LogTraceErrorMessage($"DoAirLink: PM25_last_24_hourList - count: {PM25_last_24_hourList.Count} / Average: {PM25_last_24_hourList.Average():F1}");
+      if (PM10_last_1_hourList.Count > 60) Sup.LogTraceErrorMessage($"DoAirLink: PM10_last_1_hourList - count: {PM10_last_1_hourList.Count} / Average: {PM10_last_1_hourList.Average():F1}");
+      if (PM10_last_3_hourList.Count > 3 * 60) Sup.LogTraceErrorMessage($"DoAirLink: PM10_last_3_hourList - count: {PM10_last_3_hourList.Count} / Average: {PM10_last_3_hourList.Average():F1}");
+      if (PM10_last_24_hourList.Count > 24 * 60) Sup.LogTraceErrorMessage($"DoAirLink: PM10_last_24_hourList - count: {PM10_last_24_hourList.Count} / Average: {PM10_last_24_hourList.Average():F1}");
+#endif
 
       NowCast25 = CalculateNowCast(PM25_last_24_hourList);
       NowCast10 = CalculateNowCast(PM10_last_24_hourList);
@@ -145,9 +157,9 @@ namespace zeroWsensors
     }
   }
 
-  #endregion
+#endregion
 
-  #region Webserver
+#region Webserver
 
   public delegate void delReceiveWebRequest(HttpListenerContext Context);
 
@@ -299,6 +311,6 @@ namespace zeroWsensors
     }
   }// Class Webserver
 
-  #endregion
+#endregion
 
 } // Namespace

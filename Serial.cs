@@ -56,7 +56,7 @@ namespace zeroWsensors
 
     internal bool IsAirLinkSensor;
     internal volatile PMSensordata MinuteValues = new PMSensordata();             // We communicate the average over the minute
-    static public List<PMSensordata> ObservationList = new List<PMSensordata>();  // The list to create the minutevalues
+    public List<PMSensordata> ObservationList = new List<PMSensordata>();         // The list to create the minutevalues
 
     public Serial(Support s, string Name)
     {
@@ -103,23 +103,33 @@ namespace zeroWsensors
 
     public void DoWork()
     {
-      Sensor.DoWork();
+      Sensor.DoWork(this);
     }
 
     public void SetMinuteValuesFromObservations()
     {
       if (Sensor.Valid)
       {
-        Sup.LogTraceInfoMessage($"SetMinuteValuesFromObservations: Creating minutevalues as average of the 10 second observations... {Sensor.SensorUsed}");
         lock (MinuteValues)
         {
+          Sup.LogTraceInfoMessage($"SetMinuteValuesFromObservations: Creating minutevalues as average of the 10 second observations... {SensorUsed}");
+
+          if (Program.CUSensorsSwitch.TraceInfo)
+          {
+            int i = 0;
+            foreach (PMSensordata entry in ObservationList) Sup.LogTraceInfoMessage($"Observationlist data {i++}: {entry.Pm1_atm:F1}; {entry.Pm25_atm:F1}; {entry.Pm10_atm:F1};");
+          }
+
           MinuteValues.Pm1_atm = ObservationList.Select(x => x.Pm1_atm).Average();
           MinuteValues.Pm25_atm = ObservationList.Select(x => x.Pm25_atm).Average();
           MinuteValues.Pm10_atm = ObservationList.Select(x => x.Pm10_atm).Average();
+
+          Sup.LogTraceInfoMessage($"Minutevalues data: {MinuteValues.Pm1_atm:F1}; {MinuteValues.Pm25_atm:F1}; {MinuteValues.Pm10_atm:F1};");
         }
 
         // Renew the observationlist 
-        ObservationList = new List<PMSensordata>();  // The old list disappears through the garbage collector.
+        ObservationList.Clear();
+        // ObservationList = new List<PMSensordata>();  // The old list disappears through the garbage collector.
       }
 
       return;
@@ -140,12 +150,11 @@ namespace zeroWsensors
     internal SerialPort thisSerial;               // The actual port definition: devicename, baud, stopbits etc...
     internal bool Valid;                          // Is the device defined by the user actually connected??
 
-    internal PMSensordata thisReading = new PMSensordata();
     internal byte[] buffer = new byte[32];
 
     public abstract void Open();
     public abstract void Close();
-    public abstract void DoWork();
+    public abstract void DoWork(Serial thisSensor);
 
     public SerialSensorDevice()
     {
@@ -209,7 +218,7 @@ namespace zeroWsensors
     {
     }
 
-    public override void DoWork()
+    public override void DoWork(Serial thisSensor)
     {
     }
   } // End DummyDevice
@@ -273,8 +282,10 @@ namespace zeroWsensors
       Valid = false;
     }
 
-    public override void DoWork()
+    public override void DoWork(Serial thisSensor)
     {
+      PMSensordata thisReading = new PMSensordata();
+
       // Read the input buffer, throw away all other data in the buffer and read again
       // Do this as long as there is no 32 characters in the buffer (the minimum)
       // As it fills appr every second the 5 second read I implement should be enough
@@ -304,7 +315,9 @@ namespace zeroWsensors
           thisReading.Pm25_atm = buffer[12] * 255 + buffer[13];
           thisReading.Pm10_atm = buffer[14] * 255 + buffer[15];
 
-          Serial.ObservationList.Add(thisReading);
+          Sup.LogTraceInfoMessage($"Serial data read: {thisReading.Pm1_atm:F1}; {thisReading.Pm25_atm:F1}; {thisReading.Pm10_atm:F1};");
+
+          thisSensor.ObservationList.Add(thisReading);
         }
       }
       catch (Exception e) when (e is ArgumentOutOfRangeException || e is ArgumentException || e is TimeoutException || e is InvalidOperationException || e is ArgumentNullException || e is IOException)
