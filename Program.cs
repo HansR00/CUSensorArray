@@ -22,11 +22,19 @@
  * License:     GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
  * 
  * Files:       Program.cs
+ *              EmulateAirLink.cs
  *              i2c.cs
+ *              Inifile.cs
  *              OneWire.cs (nothing there)
  *              Serial.cs
  *              Support.cs
- *              WebServer.cs
+ *              
+ * Participation: Participation is sought with the RIVM, luftdaten, etc...
+ * 1) https://sensor.community/nl/ (via RIVM)
+ * 2) https://www.samenmetenaanluchtkwaliteit.nl/
+ * 3) https://www.samenmetenaanluchtkwaliteit.nl/dataportaal
+ * 4) https://luftdaten.info/
+ * 
  */
 
 // Documentation:
@@ -89,6 +97,11 @@
 //      https://cumulus.hosiene.co.uk/viewtopic.php?f=40&t=17457
 //      https://cumulus.hosiene.co.uk/viewtopic.php?f=6&t=18417
 //      https://cumulus.hosiene.co.uk/viewtopic.php?f=44&t=18541
+//
+// Luftdaten / Sensor.Community site
+//      https://github.com/opendata-stuttgart/meta/wiki/Eintrag-in-unsere-Datenbank
+//      https://luftdaten.info/kontakt/
+//      https://devices.sensor.community/
 //
 
 using RaspberrySharp.IO.GeneralPurpose;
