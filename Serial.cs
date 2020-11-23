@@ -31,9 +31,9 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
-  public enum SerialSensorsSupported : int { Dummy, PMS1003 }
+  public enum SerialSensorsSupported : int { Dummy, Simulator, PMS1003 }
 
   #region PMSensorData
   public class PMSensordata
@@ -72,6 +72,10 @@ namespace zeroWsensors
           case SerialSensorsSupported.PMS1003:
             Sup.LogDebugMessage("Serial Constructor: Creating PMS1003 sensor");
             Sensor = new PMS1003Device(Sup, Name);
+            break;
+          case SerialSensorsSupported.Simulator:
+            Sup.LogDebugMessage("Serial Constructor: Creating PMS1003 sensor");
+            Sensor = new SerialSimulatorDevice(Sup, Name);
             break;
           default:
             Sup.LogDebugMessage($"Serial Constructor: Serial sensor not implemented {SensorUsed}");
@@ -220,6 +224,43 @@ namespace zeroWsensors
 
     public override void DoWork(Serial thisSensor)
     {
+    }
+  } // End DummyDevice
+  #endregion
+
+  #region SerialSimulatorDevice
+  internal class SerialSimulatorDevice : SerialSensorDevice
+  {
+    //Support Sup;
+
+    public SerialSimulatorDevice(Support s, string Name)
+    {
+      Sup = s;
+      Sup.LogDebugMessage($"SerialSimulatorDevice Constructor...{Name}");
+      SensorUsed = SerialSensorsSupported.Simulator;
+      Valid = true;
+    }
+
+    public override void Open()
+    {
+    }
+
+    public override void Close()
+    {
+    }
+
+    public override void DoWork(Serial thisSensor)
+    {
+      PMSensordata thisReading = new PMSensordata
+      {
+        Pm1_atm = (DateTime.Now - DateTime.UnixEpoch).TotalSeconds % 86400 / 86400 * 50,
+        Pm25_atm = (DateTime.Now - DateTime.UnixEpoch).TotalSeconds % 86400 / 86400 * 100,
+        Pm10_atm = (DateTime.Now - DateTime.UnixEpoch).TotalSeconds % 86400 / 86400 * 200
+      };
+
+      Sup.LogTraceInfoMessage($"Serial data read: {thisReading.Pm1_atm:F1}; {thisReading.Pm25_atm:F1}; {thisReading.Pm10_atm:F1};");
+
+      thisSensor.ObservationList.Add(thisReading);
     }
   } // End DummyDevice
   #endregion

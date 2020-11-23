@@ -35,7 +35,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
   public class IniFile
   {
@@ -382,9 +382,7 @@ namespace zeroWsensors
     internal void SetValue(string SectionName, string Key, DateTime Value)
     {
       // write datetimes in ISO 8601 ("sortable")
-#pragma warning disable CA1305 // Specify IFormatProvider
       SetValue(SectionName, Key, Value.ToString("s"));
-#pragma warning restore CA1305 // Specify IFormatProvider
     }
 
     #endregion "Methods"

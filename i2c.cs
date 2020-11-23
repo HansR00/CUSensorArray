@@ -25,9 +25,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
-  public enum I2cSensorsSupported : int { Dummy, SHT31 }
+  public enum I2cSensorsSupported : int { Dummy, Simulator, SHT31 }
 
   #region I2cSensorData
   public class I2cSensordata
@@ -70,6 +70,10 @@ namespace zeroWsensors
           case I2cSensorsSupported.SHT31:
             Sup.LogDebugMessage("I2C Constructor: Creating SHT31 sensor");
             Sensor = new SHT31Device(Sup, Name);
+            break;
+          case I2cSensorsSupported.Simulator:
+            Sup.LogDebugMessage("I2C Constructor: Creating SHT31 sensor");
+            Sensor = new I2cSimulatorDevice(Sup, Name);
             break;
           default:
             Sup.LogDebugMessage($"I2C Constructor: I2c sensor not implemented {SensorUsed}");
@@ -239,6 +243,42 @@ namespace zeroWsensors
     {
     }
   } // End DummyDevice
+  #endregion
+
+  #region Simulator
+  internal class I2cSimulatorDevice : I2cSensorDevice
+  {
+    readonly Support Sup;
+
+    public I2cSimulatorDevice(Support s, string Name)
+    {
+      Sup = s;
+      Sup.LogDebugMessage($"I2cSimulatorDevice Constructor...{Name}");
+      SensorUsed = I2cSensorsSupported.Simulator;
+      Valid = true;
+    }
+
+    public override void Start()
+    {
+    }
+
+    public override void Stop()
+    {
+    }
+
+    public override void DoWork(I2C thisSensor)
+    {
+      I2cSensordata thisReading = new I2cSensordata();
+
+      Sup.LogTraceInfoMessage($"I2cSimulatorDevice {SensorUsed}: DoWork routine entry");
+      // new DateTime(1970, 1, 1)
+      thisReading.Humidity = 70;
+      thisReading.TemperatureF = 77.0;   
+      thisReading.TemperatureC = 25.0;   
+
+      thisSensor.ObservationList.Add(thisReading);
+    }
+  } // End SimulatorDevice
   #endregion
 
   #region SHT31Device

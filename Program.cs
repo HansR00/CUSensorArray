@@ -99,7 +99,7 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
   // Clock definitions
   public class Program
@@ -109,18 +109,20 @@ namespace zeroWsensors
 
     public static TraceSwitch CUSensorsSwitch { get; private set; }
     public static bool AirLinkEmulation { get; private set; }
+    public static bool DoLuftdaten { get; private set; }
     public static I2cDriver ThisDriver { get; private set; }
 
     bool Continue = true;
 
     readonly I2C[] thisI2C = new I2C[MaxNrI2cSensors];              // Max 8 I2C sensors, maybe make this configurable later
     readonly Serial[] thisSerial = new Serial[MaxNrSerialSensors];  // Max two serial sensors
+
     EmulateAirLink thisEmulator;
     WebServer thisWebserver;
+    Luftdaten thisLuftdaten;
 
     Support Sup;
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0063:Use simple 'using' statement", Justification = "<Pending>")]
     private static void Main() // string[] args
     {
       Program p = new Program();
@@ -174,6 +176,9 @@ namespace zeroWsensors
 
               for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i].SetMinuteValuesFromObservations();
               for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i].SetMinuteValuesFromObservations();
+
+              // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
+              // all other necessary lists and calculated values from there
               if (AirLinkEmulation) thisEmulator.DoAirLink();
 
               // Write out to the logfile
@@ -185,8 +190,8 @@ namespace zeroWsensors
               of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}");
               of.Flush();
 
-              // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
-              // all other necessary lists and calculated values from there
+              // When all done Write out the values to luftdaten
+              if (DoLuftdaten) thisLuftdaten.Send();
             }
           }
 
@@ -221,41 +226,10 @@ namespace zeroWsensors
         // Maybe some time I do a Signal base dynamic errorlevel setting
         // but ctrl-break does  not work on my machine
         case ConsoleSpecialKey.ControlBreak:
+          // Look at the end of the file for what I thought to do here if the button worked.
+          // For now, let go.
           // Do not immedialtely stop the process.
           args.Cancel = true;
-
-          //switch (CUSensorsSwitch.Level)
-          //{
-          //  case TraceLevel.Off:
-          //    CUSensorsSwitch.Level = TraceLevel.Error;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Error:
-          //    CUSensorsSwitch.Level = TraceLevel.Warning;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Warning:
-          //    CUSensorsSwitch.Level = TraceLevel.Info;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Info:
-          //    CUSensorsSwitch.Level = TraceLevel.Verbose;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Verbose:
-          //    CUSensorsSwitch.Level = TraceLevel.Off;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  default:
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //}
           break;
 
         case ConsoleSpecialKey.ControlC:
@@ -387,9 +361,51 @@ namespace zeroWsensors
         Sup.LogDebugMessage(message: $"Init : Starting the webserver");
         thisWebserver.Start();
       }
+
+      // Do the Luftdaten Init
+      DoLuftdaten = false; // Postponed, simulation first // Sup.GetSensorsIniValue("General", "Luftdaten", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+      Sup.LogDebugMessage(message: $"Init : Starting Luftdaten: Luftdaten is {DoLuftdaten}");
+
+      if (DoLuftdaten) thisLuftdaten = new Luftdaten(Sup);
     } // Init
 
     #endregion
 
   } // Class Program
 } // Namespace zeroWsensors
+
+
+// Proposed action for Ctrl-break
+//
+//switch (CUSensorsSwitch.Level)
+//{
+//  case TraceLevel.Off:
+//    CUSensorsSwitch.Level = TraceLevel.Error;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Error:
+//    CUSensorsSwitch.Level = TraceLevel.Warning;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Warning:
+//    CUSensorsSwitch.Level = TraceLevel.Info;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Info:
+//    CUSensorsSwitch.Level = TraceLevel.Verbose;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Verbose:
+//    CUSensorsSwitch.Level = TraceLevel.Off;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  default:
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//}

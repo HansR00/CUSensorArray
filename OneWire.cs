@@ -20,7 +20,7 @@
  * 
  */
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
   class OneWire
   {

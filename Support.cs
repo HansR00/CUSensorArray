@@ -26,7 +26,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
   public class Support
   {
@@ -45,7 +45,7 @@ namespace zeroWsensors
         foreach (string file in files)
         {
           FileInfo fi = new FileInfo(file);
-          if (DateTime.Now.Subtract(fi.LastWriteTime).TotalDays > 30) fi.Delete();
+          if (DateTime.Now.Subtract(fi.LastWriteTime).TotalDays > 14) fi.Delete();
         }
       }
 
@@ -57,7 +57,6 @@ namespace zeroWsensors
 
     #region Diagnostics
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Justification = "<Pending>")]
     public void LogDebugMessage(string message) => Debug.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
     public void LogTraceErrorMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceError, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Error " + message);
     public void LogTraceWarningMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceWarning, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Warning " + message);
