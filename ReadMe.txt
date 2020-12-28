@@ -1,6 +1,6 @@
 A sensor handling program for CumulusUtils, including an AirLink Simulator
 
-© Copyright 2020 Hans Rottier hans.rottier@gmail.com
+Â© Copyright 2020 Hans Rottier hans.rottier@gmail.com
 
 Author: 	Hans Rottier hans.rottier@gmail.com
 Project: 	CUSensorArray, part of CumulusUtils project meteo-wagenborgen.nl 
@@ -31,7 +31,7 @@ I bought the sensors and the breakout circuit for roughly 35 euro, some wires an
 
 When compiled and dotnet is installed, run as follows:
 
-	nohup dotnet sudo dotnet CUSensorArray.dll
+	nohup sudo dotnet CuSensorArray.dll
 
 In version 0.4.0 configurability is added through an inifile CUSensorArray.ini. Run once to generate a file with empty fields, the program exits. The inifile looks as follows:
 
