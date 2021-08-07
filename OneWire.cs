@@ -22,20 +22,20 @@
 
 namespace CuSensorArray
 {
-  class OneWire
-  {
-    readonly Support Sup;
-
-    public OneWire(Support s)
+    class OneWire
     {
-      Sup.LogDebugMessage("OneWire: Constructor...");
-      Sup = s;
-    }
+        readonly Support Sup;
 
-    ~OneWire()
-    {
-      Sup.LogDebugMessage("OneWire: Destructor...");
+        public OneWire( Support s )
+        {
+            Sup.LogDebugMessage( "OneWire: Constructor..." );
+            Sup = s;
+        }
+
+        ~OneWire()
+        {
+            Sup.LogDebugMessage( "OneWire: Destructor..." );
+        }
     }
-  }
 }
 
