@@ -98,6 +98,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CuSensorArray
 {
@@ -109,7 +110,7 @@ namespace CuSensorArray
 
         public static TraceSwitch CUSensorsSwitch { get; private set; }
         public static bool AirLinkEmulation { get; private set; }
-        public static bool DoLuftdaten { get; private set; }
+        public static bool DoSensorCommunity { get; private set; }
         public static I2cDriver ThisDriver { get; private set; }
 
         bool Continue = true;
@@ -119,17 +120,20 @@ namespace CuSensorArray
 
         EmulateAirLink thisEmulator;
         WebServer thisWebserver;
-        Luftdaten thisLuftdaten;
+        SensorCommunity thisSensorCommunity;
 
         Support Sup;
 
-        private static void Main() // string[] args
+        static async Task Main() // string[] args
         {
+            // https://stackoverflow.com/questions/14179981/httpclient-postasync-knocks-out-the-app-with-exit-code-0
+            // Aiaiai...: this was exactly what I did. Shame on me.
+            //
             Program p = new Program();
-            p.RealMain();
+            await p.RealMain();
         }
 
-        void RealMain()
+        async Task RealMain()
         {
             Init();
 
@@ -179,7 +183,13 @@ namespace CuSensorArray
 
                             // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
                             // all other necessary lists and calculated values from there
-                            if ( AirLinkEmulation ) thisEmulator.DoAirLink();
+                            if ( AirLinkEmulation )
+                            {
+                                thisEmulator.DoAirLink();
+
+                                // When all done Write out the values to SensorCommunity
+                                if ( DoSensorCommunity ) await thisSensorCommunity.Send( thisEmulator );
+                            }
 
                             // Write out to the logfile
                             for ( int i = 0; i < MaxNrSerialSensors; i++ ) thisLine += $";{thisSerial[ i ].MinuteValues.Pm1_atm:F1};{thisSerial[ i ].MinuteValues.Pm25_atm:F1};{thisSerial[ i ].MinuteValues.Pm10_atm:F1}";
@@ -189,9 +199,6 @@ namespace CuSensorArray
                             Sup.LogTraceInfoMessage( message: $"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}" );
                             of.WriteLine( $"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}" );
                             of.Flush();
-
-                            // When all done Write out the values to luftdaten
-                            if ( DoLuftdaten ) thisLuftdaten.Send();
                         }
                     }
 
@@ -360,13 +367,13 @@ namespace CuSensorArray
             {
                 Sup.LogDebugMessage( message: $"Init : Starting the webserver" );
                 thisWebserver.Start();
+
+                // Do the SensorCommunity Init
+                DoSensorCommunity = Sup.GetSensorsIniValue( "General", "SensorCommunity", "false" ).Equals( "true", StringComparison.OrdinalIgnoreCase );
+                Sup.LogDebugMessage( message: $"Init : Starting SensorCommunity: SensorCommunity is {DoSensorCommunity}" );
+
+                if ( DoSensorCommunity ) thisSensorCommunity = new SensorCommunity( Sup );
             }
-
-            // Do the Luftdaten Init
-            DoLuftdaten = false; // Postponed, simulation first // Sup.GetSensorsIniValue("General", "Luftdaten", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
-            Sup.LogDebugMessage( message: $"Init : Starting Luftdaten: Luftdaten is {DoLuftdaten}" );
-
-            if ( DoLuftdaten ) thisLuftdaten = new Luftdaten( Sup );
         } // Init
 
         #endregion
