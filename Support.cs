@@ -26,87 +26,86 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
-  public class Support
-  {
-    private readonly IniFile CUSensorIni;
-
-    #region Constructor / Logging and ini setup
-    public Support()
+    public class Support
     {
-      // Do the logging setup, no strict nr of keeps, just prevent the nr to get too big
-      if (!Directory.Exists("log")) Directory.CreateDirectory("log");
+        private readonly IniFile CUSensorIni;
 
-      string[] files = Directory.GetFiles("log");
-
-      if (files.Length >= 10)
-      {
-        foreach (string file in files)
+        #region Constructor / Logging and ini setup
+        public Support()
         {
-          FileInfo fi = new FileInfo(file);
-          if (DateTime.Now.Subtract(fi.LastWriteTime).TotalDays > 30) fi.Delete();
+            // Do the logging setup, no strict nr of keeps, just prevent the nr to get too big
+            if ( !Directory.Exists( "log" ) ) Directory.CreateDirectory( "log" );
+
+            string[] files = Directory.GetFiles( "log" );
+
+            if ( files.Length >= 10 )
+            {
+                foreach ( string file in files )
+                {
+                    FileInfo fi = new FileInfo( file );
+                    if ( DateTime.Now.Subtract( fi.LastWriteTime ).TotalDays > 14 ) fi.Delete();
+                }
+            }
+
+            // So the ini start
+            CUSensorIni = new IniFile( this, "CUSensorArray.ini" );
         }
-      }
 
-      // So the ini start
-      CUSensorIni = new IniFile(this, "CUSensorArray.ini");
-    }
+        #endregion
 
-    #endregion
+        #region Diagnostics
 
-    #region Diagnostics
+        public void LogDebugMessage( string message ) => Debug.WriteLine( DateTime.Now.ToString( "yyyy-MM-dd HH:mm:ss.fff " ) + message );
+        public void LogTraceErrorMessage( string message ) => Trace.WriteLineIf( Program.CUSensorsSwitch.TraceError, DateTime.Now.ToString( "yyyy-MM-dd HH:mm:ss.fff " ) + "Error " + message );
+        public void LogTraceWarningMessage( string message ) => Trace.WriteLineIf( Program.CUSensorsSwitch.TraceWarning, DateTime.Now.ToString( "yyyy-MM-dd HH:mm:ss.fff " ) + "Warning " + message );
+        public void LogTraceInfoMessage( string message ) => Trace.WriteLineIf( Program.CUSensorsSwitch.TraceInfo, DateTime.Now.ToString( "yyyy-MM-dd HH:mm:ss.fff " ) + "Information " + message );
+        public void LogTraceVerboseMessage( string message ) => Trace.WriteLineIf( Program.CUSensorsSwitch.TraceVerbose, DateTime.Now.ToString( "yyyy-MM-dd HH:mm:ss.fff " ) + "Verbose " + message );
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1305:Specify IFormatProvider", Justification = "<Pending>")]
-    public void LogDebugMessage(string message) => Debug.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message);
-    public void LogTraceErrorMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceError, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Error " + message);
-    public void LogTraceWarningMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceWarning, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Warning " + message);
-    public void LogTraceInfoMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceInfo, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Information " + message);
-    public void LogTraceVerboseMessage(string message) => Trace.WriteLineIf(Program.CUSensorsSwitch.TraceVerbose, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + "Verbose " + message);
+        #endregion
 
-    #endregion
+        #region Ini
 
-    #region Ini
+        public string GetSensorsIniValue( string section, string key, string def ) => CUSensorIni.GetValue( section, key, def );
+        public void SetSensorsIniValue( string section, string key, string def ) => CUSensorIni.SetValue( section, key, def );
 
-    public string GetSensorsIniValue(string section, string key, string def) => CUSensorIni.GetValue(section, key, def);
-    public void SetSensorsIniValue(string section, string key, string def) => CUSensorIni.SetValue(section, key, def);
+        #endregion
 
-    #endregion
+        #region VersionCopyright
+        public string Version()
+        {
+            string tmp = typeof( Support ).Assembly.GetName().Version.Major + "." + typeof( Support ).Assembly.GetName().Version.Minor + "." + typeof( Support ).Assembly.GetName().Version.Build;
+            return string.Format( CultureInfo.InvariantCulture, $"CUSensorArray - Version {tmp} - Started at {DateTime.Now.ToString( "dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture )}" );
+        }
 
-    #region VersionCopyright
-    public string Version()
-    {
-      string tmp = typeof(Support).Assembly.GetName().Version.Major + "." + typeof(Support).Assembly.GetName().Version.Minor + "." + typeof(Support).Assembly.GetName().Version.Build;
-      return string.Format(CultureInfo.InvariantCulture, $"CUSensorArray - Version {tmp} - Started at {DateTime.Now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}");
-    }
+        public string Copyright => "© Hans Rottier";
 
-    public string Copyright => "© Hans Rottier";
+        #endregion
 
-    #endregion
+        #region SpecificConversionByteHex
+        public string ByteArrayToHexString( byte[] ba )
+        {
+            StringBuilder hex = new StringBuilder( ba.Length * 2 );
+            foreach ( byte b in ba )
+                hex.AppendFormat( "{0:x2}", b );
+            return hex.ToString();
+        }
 
-    #region SpecificConversionByteHex
-    public string ByteArrayToHexString(byte[] ba)
-    {
-      StringBuilder hex = new StringBuilder(ba.Length * 2);
-      foreach (byte b in ba)
-        hex.AppendFormat("{0:x2}", b);
-      return hex.ToString();
-    }
+        public string BoolArrayToBitString( bool[] b )
+        {
+            StringBuilder bitBuilder = new StringBuilder( b.Length * 2 );
 
-    public string BoolArrayToBitString(bool[] b)
-    {
-      StringBuilder bitBuilder = new StringBuilder(b.Length * 2);
+            for ( int i = 0; i < 40; i++ )
+            {
+                if ( b[ i ] ) bitBuilder.Append( "1" );
+                else bitBuilder.Append( "0" );
+                if ( ( i + 1 ) % 8 == 0 ) bitBuilder.Append( " " );
+            }
 
-      for (int i = 0; i < 40; i++)
-      {
-        if (b[i]) bitBuilder.Append("1");
-        else bitBuilder.Append("0");
-        if ((i + 1) % 8 == 0) bitBuilder.Append(" ");
-      }
+            return bitBuilder.ToString();
+        }
+        #endregion
 
-      return bitBuilder.ToString();
-    }
-    #endregion
-
-  } // Class
+    } // Class
 } // Namespace

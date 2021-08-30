@@ -111,298 +111,321 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
-namespace zeroWsensors
+namespace CuSensorArray
 {
-  // Clock definitions
-  public class Program
-  {
-    const int MaxNrSerialSensors = 2;
-    const int MaxNrI2cSensors = 8;
-
-    public static TraceSwitch CUSensorsSwitch { get; private set; }
-    public static bool AirLinkEmulation { get; private set; }
-    public static I2cDriver ThisDriver { get; private set; }
-
-    bool Continue = true;
-
-    readonly I2C[] thisI2C = new I2C[MaxNrI2cSensors];              // Max 8 I2C sensors, maybe make this configurable later
-    readonly Serial[] thisSerial = new Serial[MaxNrSerialSensors];  // Max two serial sensors
-    EmulateAirLink thisEmulator;
-    WebServer thisWebserver;
-
-    Support Sup;
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0063:Use simple 'using' statement", Justification = "<Pending>")]
-    private static void Main() // string[] args
+    // Clock definitions
+    public class Program
     {
-      Program p = new Program();
-      p.RealMain();
-    }
+        const int MaxNrSerialSensors = 2;
+        const int MaxNrI2cSensors = 8;
 
-    void RealMain()
-    {
-      Init();
+        public static TraceSwitch CUSensorsSwitch { get; private set; }
+        public static bool AirLinkEmulation { get; private set; }
+        public static bool DoSensorCommunity { get; private set; }
+        public static I2cDriver ThisDriver { get; private set; }
 
-      Sup.LogDebugMessage(message: "ZeroWsensors : ----------------------------");
-      Sup.LogDebugMessage(message: "ZeroWsensors : Entering Main");
+        bool Continue = true;
 
-      Console.WriteLine($"{Sup.Version()} {Sup.Copyright}");
-      Sup.LogDebugMessage($"{Sup.Version()} {Sup.Copyright}");
+        readonly I2C[] thisI2C = new I2C[ MaxNrI2cSensors ];              // Max 8 I2C sensors, maybe make this configurable later
+        readonly Serial[] thisSerial = new Serial[ MaxNrSerialSensors ];  // Max two serial sensors
 
-      Console.WriteLine("This program comes with ABSOLUTELY NO WARRANTY;\n" +
-        "This is free software, and you are welcome to redistribute it under certain conditions.");
-      Sup.LogDebugMessage("This program comes with ABSOLUTELY NO WARRANTY;\n" +
-        "This is free software, and you are welcome to redistribute it under certain conditions.");
+        EmulateAirLink thisEmulator;
+        WebServer thisWebserver;
+        SensorCommunity thisSensorCommunity;
 
+        Support Sup;
 
-     #region MainLoop
-
-      // Start the loop
-      using (StreamWriter of = new StreamWriter("CUSensorArray.txt", true))
-      {
-        int Clock = 0;
-
-        do
+        static async Task Main() // string[] args
         {
-          string thisLine = "";
+            // https://stackoverflow.com/questions/14179981/httpclient-postasync-knocks-out-the-app-with-exit-code-0
+            // Aiaiai...: this was exactly what I did. Shame on me.
+            //
+            Program p = new Program();
+            await p.RealMain();
+        }
 
-          // Do this condional because the ctrl-c interrupt can be given aanywhere.
-          Sup.LogTraceInfoMessage(message: "ZeroWsensors : Getting sensor values from the Main 10 second loop");
+        async Task RealMain()
+        {
+            Init();
 
-          if (Continue)
-          {
-            Clock++;
+            Sup.LogDebugMessage( message: "ZeroWsensors : ----------------------------" );
+            Sup.LogDebugMessage( message: "ZeroWsensors : Entering Main" );
 
-            for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i].DoWork();    // Takes care of the reading of the serial devices
-            for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i].DoWork();          // Takes care of the  reading of the I2C devices
+            Console.WriteLine( $"{Sup.Version()} {Sup.Copyright}" );
+            Sup.LogDebugMessage( $"{Sup.Version()} {Sup.Copyright}" );
 
-            // So we came here 6 times every 10 seconds. Create the minute values and remove the existing list, create a new one
-            // The average values are always real averages even if some fetches failed in which case the list is shorter 
-            // This is the basic work of the sensor handler: fetch data and write to local logfile
+            Console.WriteLine( "This program comes with ABSOLUTELY NO WARRANTY;\n" +
+              "This is free software, and you are welcome to redistribute it under certain conditions." );
+            Sup.LogDebugMessage( "This program comes with ABSOLUTELY NO WARRANTY;\n" +
+              "This is free software, and you are welcome to redistribute it under certain conditions." );
 
-            if (Clock == 6)
+
+            #region MainLoop
+
+            // Start the loop
+            using ( StreamWriter of = new StreamWriter( "CUSensorArray.txt", true ) )
             {
-              Clock = 0;
+                int Clock = 0;
 
-              for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i].SetMinuteValuesFromObservations();
-              for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i].SetMinuteValuesFromObservations();
-              if (AirLinkEmulation) thisEmulator.DoAirLink();
+                do
+                {
+                    string thisLine = "";
 
-              // Write out to the logfile
-              for (int i = 0; i < MaxNrSerialSensors; i++) thisLine += $";{thisSerial[i].MinuteValues.Pm1_atm:F1};{thisSerial[i].MinuteValues.Pm25_atm:F1};{thisSerial[i].MinuteValues.Pm10_atm:F1}";
-              for (int i = 0; i < MaxNrI2cSensors; i++) thisLine += $";{thisI2C[i].MinuteValues.TemperatureC:F1};{thisI2C[i].MinuteValues.Humidity:F0}";
+                    // Do this condional because the ctrl-c interrupt can be given aanywhere.
+                    Sup.LogTraceInfoMessage( message: "ZeroWsensors : Getting sensor values from the Main 10 second loop" );
 
-              Sup.LogTraceInfoMessage(message: "ZeroWsensors : Writing out the data to the logfile");
-              Sup.LogTraceInfoMessage(message: $"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}");
-              of.WriteLine($"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}");
-              of.Flush();
+                    if ( Continue )
+                    {
+                        Clock++;
 
-              // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
-              // all other necessary lists and calculated values from there
+                        for ( int i = 0; i < MaxNrSerialSensors; i++ ) thisSerial[ i ].DoWork();    // Takes care of the reading of the serial devices
+                        for ( int i = 0; i < MaxNrI2cSensors; i++ ) thisI2C[ i ].DoWork();          // Takes care of the  reading of the I2C devices
+
+                        // So we came here 6 times every 10 seconds. Create the minute values and remove the existing list, create a new one
+                        // The average values are always real averages even if some fetches failed in which case the list is shorter 
+                        // This is the basic work of the sensor handler: fetch data and write to local logfile
+
+                        if ( Clock == 6 )
+                        {
+                            Clock = 0;
+
+                            for ( int i = 0; i < MaxNrSerialSensors; i++ ) thisSerial[ i ].SetMinuteValuesFromObservations();
+                            for ( int i = 0; i < MaxNrI2cSensors; i++ ) thisI2C[ i ].SetMinuteValuesFromObservations();
+
+                            // Now we do the AirLink handling which is assumed to be called once per minute with the observation list to create 
+                            // all other necessary lists and calculated values from there
+                            if ( AirLinkEmulation )
+                            {
+                                thisEmulator.DoAirLink();
+
+                                // When all done Write out the values to SensorCommunity
+                                if ( DoSensorCommunity ) await thisSensorCommunity.Send( thisEmulator );
+                            }
+
+                            // Write out to the logfile
+                            for ( int i = 0; i < MaxNrSerialSensors; i++ ) thisLine += $";{thisSerial[ i ].MinuteValues.Pm1_atm:F1};{thisSerial[ i ].MinuteValues.Pm25_atm:F1};{thisSerial[ i ].MinuteValues.Pm10_atm:F1}";
+                            for ( int i = 0; i < MaxNrI2cSensors; i++ ) thisLine += $";{thisI2C[ i ].MinuteValues.TemperatureC:F1};{thisI2C[ i ].MinuteValues.Humidity:F0}";
+
+                            Sup.LogTraceInfoMessage( message: "ZeroWsensors : Writing out the data to the logfile" );
+                            Sup.LogTraceInfoMessage( message: $"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}" );
+                            of.WriteLine( $"{DateTime.Now:dd-MM-yyyy HH:mm}{thisLine}" );
+                            of.Flush();
+                        }
+                    }
+
+                    // This is really hardcoded and should NOT change. The whole thing is based on 6 measurements per minute, so loop every 10 seconds
+                    Thread.Sleep( 10000 );
+                } while ( Continue ); // Do-While
+            } // Using the datafile
+
+            #endregion
+
+            Sup.LogDebugMessage( "SensorArray Gracefull exit... End" );
+
+            Trace.Flush();
+            Trace.Close();
+
+            return;
+        } // Real main()
+
+        #region CtrlC-Handler
+        // Now set the handler and do the processing
+        //
+        void CtrlCHandler( object sender, ConsoleCancelEventArgs args )
+        {
+            Sup.LogDebugMessage( "SensorArray Gracefull exit... Begin" );
+
+            ConsoleSpecialKey Key = args.SpecialKey;
+            //Sup.LogDebugMessage($"Key Pressed: {Key}");
+            //Console.WriteLine($"Key Pressed: {Key}");
+
+            switch ( Key )
+            {
+                // Maybe some time I do a Signal base dynamic errorlevel setting
+                // but ctrl-break does  not work on my machine
+                case ConsoleSpecialKey.ControlBreak:
+                    // Look at the end of the file for what I thought to do here if the button worked.
+                    // For now, let go.
+                    // Do not immedialtely stop the process.
+                    args.Cancel = true;
+                    break;
+
+                case ConsoleSpecialKey.ControlC:
+                    for ( int i = 0; i < MaxNrI2cSensors; i++ ) thisI2C[ i ].Stop();
+                    for ( int i = 0; i < MaxNrSerialSensors; i++ ) thisSerial[ i ].Stop();
+                    if ( AirLinkEmulation ) thisWebserver.Stop();
+                    args.Cancel = true;   // Do not immedialtely stop the process, handle it by the Continue loop control boolean.
+                    Continue = false;
+                    break;
+
+                default:
+                    // Should be impossible
+                    break;
             }
-          }
 
-          // This is really hardcoded and should NOT change. The whole thing is based on 6 measurements per minute, so loop every 10 seconds
-          Thread.Sleep(10000);
-        } while (Continue); // Do-While
-      } // Using the datafile
-
-      #endregion
-
-      Sup.LogDebugMessage("SensorArray Gracefull exit... End");
-
-      Trace.Flush();
-      Trace.Close();
-
-      return;
-    } // Real main()
-
-    #region CtrlC-Handler
-    // Now set the handler and do the processing
-    //
-    void CtrlCHandler(object sender, ConsoleCancelEventArgs args)
-    {
-      Sup.LogDebugMessage("SensorArray Gracefull exit... Begin");
-
-      ConsoleSpecialKey Key = args.SpecialKey;
-      //Sup.LogDebugMessage($"Key Pressed: {Key}");
-      //Console.WriteLine($"Key Pressed: {Key}");
-
-      switch (Key)
-      {
-        // Maybe some time I do a Signal base dynamic errorlevel setting
-        // but ctrl-break does  not work on my machine
-        case ConsoleSpecialKey.ControlBreak:
-          // Do not immedialtely stop the process.
-          args.Cancel = true;
-
-          //switch (CUSensorsSwitch.Level)
-          //{
-          //  case TraceLevel.Off:
-          //    CUSensorsSwitch.Level = TraceLevel.Error;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Error:
-          //    CUSensorsSwitch.Level = TraceLevel.Warning;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Warning:
-          //    CUSensorsSwitch.Level = TraceLevel.Info;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Info:
-          //    CUSensorsSwitch.Level = TraceLevel.Verbose;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  case TraceLevel.Verbose:
-          //    CUSensorsSwitch.Level = TraceLevel.Off;
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //  default:
-          //    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
-          //    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
-          //    break;
-          //}
-          break;
-
-        case ConsoleSpecialKey.ControlC:
-          for (int i = 0; i < MaxNrI2cSensors; i++) thisI2C[i].Stop();
-          for (int i = 0; i < MaxNrSerialSensors; i++) thisSerial[i].Stop();
-          if (AirLinkEmulation) thisWebserver.Stop();
-          args.Cancel = true;   // Do not immedialtely stop the process, handle it by the Continue loop control boolean.
-          Continue = false;
-          break;
-
-        default:
-          // Should be impossible
-          break;
-      }
-
-      return;
-    }
-
-    #endregion
-
-    #region Init
-    void Init()
-    {
-      bool NoSerialDevice = false;
-      bool NoI2cDevice = false;
-
-      // Setup logging and Ini
-      Sup = new Support();
-
-      Sup.LogDebugMessage(message: "Init() : Start");
-
-      string AirLinkPMDevice = "";
-      string AirLinkTHDevice = "";
-
-      Console.CancelKeyPress += new ConsoleCancelEventHandler(CtrlCHandler);
-      CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
-
-      // Setup tracing
-      Trace.Listeners.Add(new TextWriterTraceListener($"log/{DateTime.Now.ToString("yyMMddHHmm", CultureInfo.InvariantCulture)}sensors.log"));
-      Trace.AutoFlush = true;
-      CUSensorsSwitch = new TraceSwitch("CUSensorsSwitch", "Tracing switch for CUSensors")
-      {
-        Level = TraceLevel.Verbose
-      };
-
-      Sup.LogDebugMessage($"Initial {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
-
-      string thisTrace = Sup.GetSensorsIniValue("General", "TraceInfo", "Warning");   // Verbose, Information, Warning, Error, Off
-
-      // Now set the Trace level to the wanted value
-      switch (thisTrace.ToLower())
-      {
-        case "error": CUSensorsSwitch.Level = TraceLevel.Error; break;
-        case "warning": CUSensorsSwitch.Level = TraceLevel.Warning; break;
-        case "info": CUSensorsSwitch.Level = TraceLevel.Info; break;
-        case "verbose": CUSensorsSwitch.Level = TraceLevel.Verbose; break;
-        default: CUSensorsSwitch.Level = TraceLevel.Off; break;
-      }
-
-      Sup.LogDebugMessage($"According to Inifile {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, ");
-
-      // Determine which sensor has to be for the AirLink:
-      AirLinkEmulation = Sup.GetSensorsIniValue("General", "AirLinkEmulation", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
-      AirLinkPMDevice = Sup.GetSensorsIniValue("AirLinkDevices", $"PMdevice", "");
-      AirLinkTHDevice = Sup.GetSensorsIniValue("AirLinkDevices", $"THdevice", "");
-
-      // Check if we want AirLinkEmulation and do accordingly
-      //
-      if (AirLinkEmulation)
-      {
-        Sup.LogDebugMessage(message: "Init : Creating the AirLink Emulator and the Webserver");
-        thisEmulator = new EmulateAirLink(Sup);
-        thisWebserver = new WebServer(Sup, thisEmulator);
-      }
-
-      // Do the Serial devices
-      Sup.LogDebugMessage(message: "Init : Creating the Serial devices");
-      for (int i = 0; i < MaxNrSerialSensors; i++)
-      {
-        string DeviceName = Sup.GetSensorsIniValue("SerialDevices", $"Serial{i}", "");
-        thisSerial[i] = new Serial(Sup, DeviceName);
-        if (AirLinkEmulation && $"Serial{i}" == AirLinkPMDevice)
-        {
-          Sup.LogDebugMessage(message: $"Init : Serial{i} is AirLink device");
-          thisSerial[i].IsAirLinkSensor = true;
-          thisEmulator.SetSerialDevice(thisSerial[i]);
+            return;
         }
 
-        if (i == 0 && string.IsNullOrEmpty(DeviceName))
+        #endregion
+
+        #region Init
+        void Init()
         {
-          NoSerialDevice = true;
-          break;
-        }
-      }// Serial devices
+            bool NoSerialDevice = false;
+            bool NoI2cDevice = false;
 
-      // Do the i2c devices
-      // Define the driver on this level so we only have one driver in the system on which we open all connections
-      Sup.LogTraceInfoMessage(message: "Init : Creating the I2C driver");
-      ThisDriver = new I2cDriver(ProcessorPin.Gpio02, ProcessorPin.Gpio03, false);
-      Sup.LogTraceInfoMessage(message: $"Init : created the I2cDriver {ThisDriver}");
-      I2C.DetectSensors(Sup);
+            // Setup logging and Ini
+            Sup = new Support();
 
-      for (int i = 0; i < MaxNrI2cSensors; i++)
-      {
-        string DeviceName = Sup.GetSensorsIniValue("I2CDevices", $"I2C{i}", "");
-        thisI2C[i] = new I2C(Sup, DeviceName);
-        if (AirLinkEmulation && $"I2C{i}" == AirLinkTHDevice)
-        {
-          Sup.LogDebugMessage(message: $"Init : I2C{i} is AirLink device");
-          thisI2C[i].IsAirLinkSensor = true;
-          thisEmulator.SetI2cDevice(thisI2C[i]);
-        }
+            Sup.LogDebugMessage( message: "Init() : Start" );
 
-        if (i == 0 && string.IsNullOrEmpty(DeviceName))
-        {
-          NoI2cDevice = true;
-          break;
-        }
-      }// i2c devices
+            string AirLinkPMDevice = "";
+            string AirLinkTHDevice = "";
 
-      if (AirLinkEmulation && (NoI2cDevice || NoSerialDevice))
-      {
-        Sup.LogDebugMessage("Init: At leat one serial and one I2c device is required for PM and T/H in AirLink emulation");
-        Environment.Exit(0);
-      }
+            Console.CancelKeyPress += new ConsoleCancelEventHandler( CtrlCHandler );
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 
-      if (AirLinkEmulation)
-      {
-        Sup.LogDebugMessage(message: $"Init : Starting the webserver");
-        thisWebserver.Start();
-      }
-    } // Init
+            // Setup tracing
+            Trace.Listeners.Add( new TextWriterTraceListener( $"log/{DateTime.Now.ToString( "yyMMddHHmm", CultureInfo.InvariantCulture )}sensors.log" ) );
+            Trace.AutoFlush = true;
+            CUSensorsSwitch = new TraceSwitch( "CUSensorsSwitch", "Tracing switch for CUSensors" )
+            {
+                Level = TraceLevel.Verbose
+            };
 
-    #endregion
+            Sup.LogDebugMessage( $"Initial {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, " );
 
-  } // Class Program
+            string thisTrace = Sup.GetSensorsIniValue( "General", "TraceInfo", "Warning" );   // Verbose, Information, Warning, Error, Off
+
+            // Now set the Trace level to the wanted value
+            switch ( thisTrace.ToLower() )
+            {
+                case "error": CUSensorsSwitch.Level = TraceLevel.Error; break;
+                case "warning": CUSensorsSwitch.Level = TraceLevel.Warning; break;
+                case "info": CUSensorsSwitch.Level = TraceLevel.Info; break;
+                case "verbose": CUSensorsSwitch.Level = TraceLevel.Verbose; break;
+                default: CUSensorsSwitch.Level = TraceLevel.Off; break;
+            }
+
+            Sup.LogDebugMessage( $"According to Inifile {CUSensorsSwitch} => Error: {CUSensorsSwitch.TraceError}, Warning: {CUSensorsSwitch.TraceWarning}, Info: {CUSensorsSwitch.TraceInfo}, Verbose: {CUSensorsSwitch.TraceVerbose}, " );
+
+            // Determine which sensor has to be for the AirLink:
+            AirLinkEmulation = Sup.GetSensorsIniValue( "General", "AirLinkEmulation", "false" ).Equals( "true", StringComparison.OrdinalIgnoreCase );
+            AirLinkPMDevice = Sup.GetSensorsIniValue( "AirLinkDevices", $"PMdevice", "" );
+            AirLinkTHDevice = Sup.GetSensorsIniValue( "AirLinkDevices", $"THdevice", "" );
+
+            // Check if we want AirLinkEmulation and do accordingly
+            //
+            if ( AirLinkEmulation )
+            {
+                Sup.LogDebugMessage( message: "Init : Creating the AirLink Emulator and the Webserver" );
+                thisEmulator = new EmulateAirLink( Sup );
+                thisWebserver = new WebServer( Sup, thisEmulator );
+            }
+
+            // Do the Serial devices
+            Sup.LogDebugMessage( message: "Init : Creating the Serial devices" );
+            for ( int i = 0; i < MaxNrSerialSensors; i++ )
+            {
+                string DeviceName = Sup.GetSensorsIniValue( "SerialDevices", $"Serial{i}", "" );
+                thisSerial[ i ] = new Serial( Sup, DeviceName );
+                if ( AirLinkEmulation && $"Serial{i}" == AirLinkPMDevice )
+                {
+                    Sup.LogDebugMessage( message: $"Init : Serial{i} is AirLink device" );
+                    thisSerial[ i ].IsAirLinkSensor = true;
+                    thisEmulator.SetSerialDevice( thisSerial[ i ] );
+                }
+
+                if ( i == 0 && string.IsNullOrEmpty( DeviceName ) )
+                {
+                    NoSerialDevice = true;
+                    break;
+                }
+            }// Serial devices
+
+            // Do the i2c devices
+            // Define the driver on this level so we only have one driver in the system on which we open all connections
+            Sup.LogTraceInfoMessage( message: "Init : Creating the I2C driver" );
+            ThisDriver = new I2cDriver( ProcessorPin.Gpio02, ProcessorPin.Gpio03, false );
+            Sup.LogTraceInfoMessage( message: $"Init : created the I2cDriver {ThisDriver}" );
+            I2C.DetectSensors( Sup );
+
+            for ( int i = 0; i < MaxNrI2cSensors; i++ )
+            {
+                string DeviceName = Sup.GetSensorsIniValue( "I2CDevices", $"I2C{i}", "" );
+                thisI2C[ i ] = new I2C( Sup, DeviceName );
+                if ( AirLinkEmulation && $"I2C{i}" == AirLinkTHDevice )
+                {
+                    Sup.LogDebugMessage( message: $"Init : I2C{i} is AirLink device" );
+                    thisI2C[ i ].IsAirLinkSensor = true;
+                    thisEmulator.SetI2cDevice( thisI2C[ i ] );
+                }
+
+                if ( i == 0 && string.IsNullOrEmpty( DeviceName ) )
+                {
+                    NoI2cDevice = true;
+                    break;
+                }
+            }// i2c devices
+
+            if ( AirLinkEmulation && ( NoI2cDevice || NoSerialDevice ) )
+            {
+                Sup.LogDebugMessage( "Init: At leat one serial and one I2c device is required for PM and T/H in AirLink emulation" );
+                Environment.Exit( 0 );
+            }
+
+            if ( AirLinkEmulation )
+            {
+                Sup.LogDebugMessage( message: $"Init : Starting the webserver" );
+                thisWebserver.Start();
+
+                // Do the SensorCommunity Init
+                DoSensorCommunity = Sup.GetSensorsIniValue( "General", "SensorCommunity", "false" ).Equals( "true", StringComparison.OrdinalIgnoreCase );
+                Sup.LogDebugMessage( message: $"Init : Starting SensorCommunity: SensorCommunity is {DoSensorCommunity}" );
+
+                if ( DoSensorCommunity ) thisSensorCommunity = new SensorCommunity( Sup );
+            }
+        } // Init
+
+        #endregion
+
+    } // Class Program
 } // Namespace zeroWsensors
+
+
+// Proposed action for Ctrl-break
+//
+//switch (CUSensorsSwitch.Level)
+//{
+//  case TraceLevel.Off:
+//    CUSensorsSwitch.Level = TraceLevel.Error;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Error:
+//    CUSensorsSwitch.Level = TraceLevel.Warning;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Warning:
+//    CUSensorsSwitch.Level = TraceLevel.Info;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Info:
+//    CUSensorsSwitch.Level = TraceLevel.Verbose;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  case TraceLevel.Verbose:
+//    CUSensorsSwitch.Level = TraceLevel.Off;
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//  default:
+//    Console.WriteLine($"Trace level set to {CUSensorsSwitch.Level}");
+//    Sup.LogDebugMessage($"Trace level set to {CUSensorsSwitch.Level}");
+//    break;
+//}

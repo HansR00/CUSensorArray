@@ -27,6 +27,8 @@ Data is written out to CUSensorArray.txt for local use.
 
 A small webserver is present to mimic the Davis interface if its AirLink Air quality sensor. This is especially designed for CumulusMX, but any (and I mean any) request to this server will get as a reply the JSON structure with the current data. All averages are being served including the nowcast exponential interpolation.
 
+If you wish to develop before having a sensor you can use the FakeAirLink with Dummy or Simulator devices (specify in the ini-file
+
 I bought the sensors and the breakout circuit for roughly 35 euro, some wires and breadboard you're supposed to have. Add a Raspberry Pi (from 3B+) for euro 35 and you'll have a cheap solution with high learning capability. Look carfully to the wiring / pins.
 
 When compiled and dotnet is installed, run as follows:
@@ -45,11 +47,13 @@ PMdevice=Serial0
 THdevice=I2C0
 
 [SerialDevices]			Defines the serial [PM]sensors
-Serial0=PMS1003
+Serial0=PMS1003			Empty devices spec will be auto filled with Dummy
+;Serial0=Simulator		Simulator generates numbers from midnight to its maximum in a straight line (max: 50, 100, 200)
 Serial1=
 
 [I2CDevices]			Defines the I2C sensors
-I2C0=SHT31
+I2C0=SHT31			Empty devices spec will be auto filled with Dummy
+;I2C0=Simulator			Simulator generates numbers from midnight to its maximum in a straight line (max: 50, 100, 200)
 I2C1=
 I2C2=
 I2C3=
