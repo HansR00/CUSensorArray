@@ -41,6 +41,8 @@ In version 0.4.0 configurability is added through an inifile CUSensorArray.ini. 
 [General]
 TraceInfo=Warning		Possible Error, Warning, Info, Verbose, None
 AirLinkEmulation=true		true or false
+UseCalibration=false		true or false
+SensorCommunity=true		true or false
 
 [AirLinkDevices]		Defines which sensors constitute the AirLink
 PMdevice=Serial0		
