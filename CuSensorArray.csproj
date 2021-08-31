@@ -5,13 +5,13 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <StartupObject>CuSensorArray.Program</StartupObject>
     <Authors>Hans Rottier</Authors>
-    <Version>0.8.5</Version>
-    <AssemblyVersion>0.8.6.0</AssemblyVersion>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
     <PackageId>CUSensorArray</PackageId>
     <Product>CUSensorArray</Product>
     <Copyright>Hans Rottier</Copyright>
     <LangVersion>8.0</LangVersion>
-    <FileVersion>0.8.6.0</FileVersion>
+    <FileVersion>1.0.1.0</FileVersion>
     <PackageLicenseFile></PackageLicenseFile>
     <RepositoryUrl>https://github.com/HansR00/CUSensorArray</RepositoryUrl>
     <RepositoryType>Github</RepositoryType>

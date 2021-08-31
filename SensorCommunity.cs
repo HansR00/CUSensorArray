@@ -22,8 +22,8 @@ namespace CuSensorArray
             Sup.LogDebugMessage( $"SensorCommunity ctor: Start" );
 
             SensorCommunityHttpClient = new HttpClient();
-            SensorCommunityHttpClient.Timeout = TimeSpan.FromSeconds(30);
-            SensorCommunityHttpClient.BaseAddress = new Uri(URL);
+            SensorCommunityHttpClient.Timeout = TimeSpan.FromSeconds( 30 );
+            SensorCommunityHttpClient.BaseAddress = new Uri( URL );
 
             using ( StreamReader cpuFile = new StreamReader( "/proc/cpuinfo" ) )
             {
@@ -54,7 +54,7 @@ namespace CuSensorArray
             // LuftdatenHttpClient.Dispose();
         }
 
-        internal async Task Send(EmulateAirLink thisEmulator)
+        internal async Task Send( EmulateAirLink thisEmulator )
         {
             string HTDataToSend;
             string PMDataToSend;
@@ -81,7 +81,7 @@ namespace CuSensorArray
             await PostToSensorCommunity( HTDataToSend, PMDataToSend );
         }
 
-        private async Task PostToSensorCommunity( string HTdata, string PMdata)
+        private async Task PostToSensorCommunity( string HTdata, string PMdata )
         {
             try
             {
@@ -90,7 +90,7 @@ namespace CuSensorArray
                 using ( StringContent content = new StringContent( HTdata, Encoding.UTF8, "application/json" ) )
                 {
                     // BME280 use 11   for SHT31 use 7
-                    content.Headers.Add("X-pin", "7"); 
+                    content.Headers.Add( "X-pin", "7" );
                     content.Headers.Add( "X-Sensor", $"{SensorID}" );
 
                     using ( HttpResponseMessage response = await SensorCommunityHttpClient.PostAsync( "", content ) )
