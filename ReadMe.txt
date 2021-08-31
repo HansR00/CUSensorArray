@@ -29,13 +29,18 @@ A small webserver is present to mimic the Davis interface if its AirLink Air qua
 
 If you wish to develop before having a sensor you can use the FakeAirLink with Dummy or Simulator devices (specify in the ini-file
 
-I bought the sensors and the breakout circuit for roughly 35 euro, some wires and breadboard you're supposed to have. Add a Raspberry Pi (from 3B+) for euro 35 and you'll have a cheap solution with high learning capability. Look carfully to the wiring / pins.
+I bought the sensors and the breakout circuit for roughly 35 euro, some wires and breadboard you're supposed to have. Add a Raspberry Pi (from 3B+) for euro 35 and you'll have a cheap solution with high learning capability. Look carefully to the wiring / pins.
 
 When compiled and dotnet is installed, run as follows:
 
-	nohup sudo dotnet CuSensorArray.dll
+	nohup sudo dotnet CuSensorArray.dll&
 
-In version 0.4.0 configurability is added through an inifile CUSensorArray.ini. Run once to generate a file with empty fields, the program exits. The inifile looks as follows:
+In version 0.4.0 configurability is added through an inifile CUSensorArray.ini. Run once to generate a file with empty fields, the program exits. 
+In version 1.0.0 Everything is finished and ready to go with the PMS1003 and the SHT31. Use Sensor.Community by creating a sensor on their site. The sensorID you will find in the  logfile after running once with SensorCommunity=true. Only use the numerical part in the sensor.community sensor creation form.
+
+Any questions? Let me know.
+
+The inifile looks as follows:
 
 --------------------------------
 [General]
